@@ -31,16 +31,27 @@
 
   <!-- Navbar -->
   <nav class="bg-honey shadow-md">
-    <div class="container mx-auto px-6 py-3">
-      <div class="flex justify-between items-center">
-        <div class="text-lg font-bold text-mead-dark">Huskarlar Mjöderi</div>
-        <div>
-          <a href="#history" class="text-mead-dark hover:text-gray-900 mx-4">Historia</a>
-          <a href="#about" class="text-mead-dark hover:text-gray-900 mx-4">Om Oss</a>
-          <a href="#mead" class="text-mead-dark hover:text-gray-900 mx-4">Våra Mjöd</a>
-          <a href="#contact" class="text-mead-dark hover:text-gray-900 mx-4">Kontakta Oss</a>
-        </div>
+    <div class="container mx-auto px-6 py-3 flex justify-between items-center">
+      <div class="text-lg font-bold text-mead-dark">Huskarlar Mjöderi</div>
+      <div class="hidden md:flex space-x-4">
+        <a href="#history" class="text-mead-dark hover:text-gray-900">Historia</a>
+        <a href="#about" class="text-mead-dark hover:text-gray-900">Om Oss</a>
+        <a href="#mead" class="text-mead-dark hover:text-gray-900">Våra Mjöd</a>
+        <a href="#contact" class="text-mead-dark hover:text-gray-900">Kontakta Oss</a>
       </div>
+      <div class="md:hidden">
+        <button id="menu-btn" class="text-mead-dark focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div id="menu" class="hidden md:hidden">
+      <a href="#history" class="block text-mead-dark hover:text-gray-900 px-4 py-2">Historia</a>
+      <a href="#about" class="block text-mead-dark hover:text-gray-900 px-4 py-2">Om Oss</a>
+      <a href="#mead" class="block text-mead-dark hover:text-gray-900 px-4 py-2">Våra Mjöd</a>
+      <a href="#contact" class="block text-mead-dark hover:text-gray-900 px-4 py-2">Kontakta Oss</a>
     </div>
   </nav>
 
@@ -119,6 +130,14 @@
       <p class="text-mead-dark">© 2024 Huskarlar Mjöderi. Alla rättigheter förbehållna.</p>
     </div>
   </footer>
+
+  <script>
+    const menuBtn = document.getElementById('menu-btn');
+    const menu = document.getElementById('menu');
+    menuBtn.addEventListener('click', () => {
+      menu.classList.toggle('hidden');
+    });
+  </script>
 
 </body>
 </html>
