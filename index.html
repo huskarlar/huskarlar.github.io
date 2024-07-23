@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Huskarlar Mjöderi</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <style>
+    .bg-honey {
+      background-color: #f4c542;
+    }
+    .bg-mead {
+      background-color: #e0a800;
+    }
+    .text-honey-dark {
+      color: #b28704;
+    }
+    .text-mead-dark {
+      color: #946300;
+    }
+    .hero-text {
+      position: absolute;
+      bottom: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+  <!-- Navbar -->
+  <nav class="bg-honey shadow-md">
+    <div class="container mx-auto px-6 py-3">
+      <div class="flex justify-between items-center">
+        <div class="text-lg font-bold text-mead-dark">Huskarlar Mjöderi</div>
+        <div>
+          <a href="#history" class="text-mead-dark hover:text-gray-900 mx-4">Historia</a>
+          <a href="#about" class="text-mead-dark hover:text-gray-900 mx-4">Om Oss</a>
+          <a href="#mead" class="text-mead-dark hover:text-gray-900 mx-4">Våra Mjöd</a>
+          <a href="#contact" class="text-mead-dark hover:text-gray-900 mx-4">Kontakta Oss</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="relative bg-cover bg-center h-screen" style="background-image: url('hero.webp');">
+    <div class="hero-text text-white">
+      <h1 class="text-4xl md:text-6xl font-bold">Huskarlar Mjöderi</h1>
+      <p class="mt-4 mb-4 text-lg md:text-2xl">Upptäck traditionens smak</p>
+    </div>
+  </section>
+
+  <!-- Historia Section -->
+  <section id="history" class="py-20 bg-mead">
+    <div class="container mx-auto px-6 text-center">
+      <h2 class="text-3xl font-bold text-white">Historia</h2>
+      <p class="mt-4 text-white">Vår resa började för många år sedan, inspirerad av nordiska traditioner och passionen för mjöd.</p>
+      <div class="mt-8 flex justify-center">
+        <img src="first.jpg" alt="Historia Bild" class="rounded-lg shadow-lg">
+      </div>
+    </div>
+  </section>
+
+  <!-- Om Oss Section -->
+  <section id="about" class="py-20 bg-honey">
+    <div class="container mx-auto px-6 text-center">
+      <h2 class="text-3xl font-bold text-mead-dark">Om Oss</h2>
+      <p class="mt-4 text-mead-dark">Vi är ett dedikerat team av mjödentusiaster som strävar efter att skapa den bästa möjliga produkten.</p>
+      <div class="mt-8 flex justify-center">
+        <img src="bottling.jpg" alt="Om Oss Bild" class="rounded-lg shadow-lg">
+      </div>
+    </div>
+  </section>
+
+  <!-- Våra Mjöd Section -->
+  <section id="mead" class="py-20 bg-mead">
+    <div class="container mx-auto px-6 text-center">
+      <h2 class="text-3xl font-bold text-white">Våra Mjöd</h2>
+      <p class="mt-4 text-white">Utforska vårt urval av mjöd, från traditionella smaker till moderna tolkningar.</p>
+      <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Mjöd 1 -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+          <img src="latest.jpg" alt="Mjöd 1" class="rounded-lg mb-4">
+          <h3 class="text-xl font-bold text-mead-dark">Blueberry Mead</h3>
+          <p class="mt-2 text-gray-600">Ett mjöd gjort på blåbär.</p>
+        </div>
+        <!-- Mjöd 2 -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+          <img src="clear.jpg" alt="Mjöd 2" class="rounded-lg mb-4">
+          <h3 class="text-xl font-bold text-mead-dark">Clear Mead</h3>
+          <p class="mt-2 text-gray-600">Vårt första mjöd som blev klart.</p>
+        </div>
+        <!-- Mjöd 3 -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+          <img src="queen.jpg" alt="Mjöd 3" class="rounded-lg mb-4">
+          <h3 class="text-xl font-bold text-mead-dark">Queen Mead</h3>
+          <p class="mt-2 text-gray-600">Ett mjöd gjort på blåbär och hallon.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Kontakta Oss Section -->
+  <section id="contact" class="py-20 bg-honey">
+    <div class="container mx-auto px-6 text-center">
+      <h2 class="text-3xl font-bold text-mead-dark">Kontakta Oss</h2>
+      <p class="mt-4 text-mead-dark">Har du frågor eller vill veta mer om våra produkter? Hör av dig till oss!</p>
+      <div class="mt-8">
+        <a href="mailto:huskarlarmeadery@gmail.com" class="text-lg text-mead-dark underline">huskarlarmeadery@gmail.com</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-honey py-6">
+    <div class="container mx-auto px-6 text-center">
+      <p class="text-mead-dark">© 2024 Huskarlar Mjöderi. Alla rättigheter förbehållna.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
