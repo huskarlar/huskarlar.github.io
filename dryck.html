@@ -21,11 +21,12 @@
     }
     .hero-text {
       position: absolute;
-      bottom: 10%;
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%);
       text-align: center;
       max-width: 90%;
+      width: 100%;
     }
     .overlay {
       position: absolute;
@@ -42,9 +43,18 @@
   <section class="relative bg-cover bg-center h-screen" style="background-image: url('hero.webp');">
     <div class="overlay"></div>
     <div class="hero-text text-white">
-      <a href="https://huskarlar.github.io/"><h1 class="text-4xl md:text-6xl font-bold underline">Huskarlar Mjöderi</h1></a>
-      <div id="drink-content">
-        <p class="mt-4 text-xl md:text-2xl" id="drink-info">Laddar dryckens information...</p>
+      <h1 class="text-4xl md:text-6xl font-bold">Huskarlar Mjöderi</h1>
+      <div id="drink-content" class="mt-6 flex flex-col md:flex-row md:items-center md:justify-center">
+        <!-- Text Content -->
+        <div class="md:w-1/2 md:pr-4">
+          <div id="drink-info">
+            <p class="mt-4 text-xl md:text-2xl">Laddar dryckens information...</p>
+          </div>
+        </div>
+        <!-- Image Content -->
+        <div class="mt-4 md:mt-0 md:w-1/2 md:pl-4">
+          <img src="" alt="Dryck Bild" id="drink-image" class="rounded-lg shadow-lg mx-auto max-h-64 md:max-h-80">
+        </div>
       </div>
     </div>
   </section>
@@ -82,10 +92,10 @@
     const { data: dataEncoded, signature: signatureEncoded } = getUrlParams();
 
     const drinkInfoElement = document.getElementById('drink-info');
-    const drinkContentElement = document.getElementById('drink-content');
+    const drinkImageElement = document.getElementById('drink-image');
 
     if (!dataEncoded || !signatureEncoded) {
-      drinkInfoElement.innerText = 'Ingen data eller signatur tillhandahölls.';
+      drinkInfoElement.innerHTML = '<p>Ingen data eller signatur tillhandahölls.</p>';
       return;
     }
 
@@ -105,23 +115,25 @@
       // Parse CSV data
       const [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber] = data.split(';');
 
-      // Update the page with the drink information
-      const contentHTML = `
+      // Construct the information HTML
+      const infoHTML = `
         <p class="mt-4 text-xl md:text-2xl">Du njuter av <strong>${name}</strong>!</p>
         <p class="mt-2 text-lg">Tillverkningsdatum: ${batchDate}</p>
         <p class="mt-1 text-lg">Batchnummer: ${batchNumber}</p>
         <p class="mt-1 text-lg">Kvantitet: ${batchQuantity}</p>
         <p class="mt-1 text-lg">Ingredienser: ${ingredients}</p>
         <p class="mt-1 text-lg">Flasknummer: ${sequenceNumber}</p>
-        <div class="mt-4 flex justify-center">
-          <img src="${imageFilename}" alt="${name}" class="rounded-lg shadow-lg max-w-xs">
-        </div>
       `;
 
-      drinkContentElement.innerHTML = contentHTML;
+      // Update the drink info
+      drinkInfoElement.innerHTML = infoHTML;
+
+      // Update the image
+      drinkImageElement.src = imageFilename;
+      drinkImageElement.alt = name;
 
     } else {
-      drinkInfoElement.innerText = 'Signaturverifiering misslyckades.';
+      drinkInfoElement.innerHTML = '<p>Signaturverifiering misslyckades.</p>';
     }
   })();
   </script>
