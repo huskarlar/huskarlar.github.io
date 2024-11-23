@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Huskarlar Mjöderi - Dryck Information</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Tailwind CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <style>
+    .bg-honey {
+      background-color: #f4c542;
+    }
+    .bg-mead {
+      background-color: #e0a800;
+    }
+    .text-honey-dark {
+      color: #b28704;
+    }
+    .text-mead-dark {
+      color: #946300;
+    }
+    .hero-text {
+      position: absolute;
+      bottom: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      max-width: 90%;
+    }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans">
+  <!-- Hero Section -->
+  <section class="relative bg-cover bg-center h-screen" style="background-image: url('hero.webp');">
+    <div class="overlay"></div>
+    <div class="hero-text text-white">
+      <h1 class="text-4xl md:text-6xl font-bold">Huskarlar Mjöderi</h1>
+      <div id="drink-content">
+        <p class="mt-4 text-xl md:text-2xl" id="drink-info">Laddar dryckens information...</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-honey py-6">
+    <div class="container mx-auto px-6 text-center">
+      <p class="text-mead-dark">© 2024 Huskarlar Mjöderi. Alla rättigheter förbehållna.</p>
+    </div>
+  </footer>
+
+  <!-- Include elliptic library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
+  <script>
+  (function() {
+    // Paste your public key (hex format) here
+    const publicKeyHex = '045a1a4c86397cb70099cdd7ee8717eb79b370f84daced8bbe5ff7b5f9995ef7047860fdce7058a11d7fee08affa8224c4467f8dee7f511594970361caac6ff9ee';
+
+    // Initialize elliptic curve
+    const EC = window.elliptic.ec;
+    const ec = new EC('secp256k1');
+
+    // Reconstruct public key
+    const key = ec.keyFromPublic(publicKeyHex, 'hex');
+
+    // Function to get data and signature from URL
+    function getUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        data: params.get('data'),
+        signature: params.get('signature')
+      };
+    }
+
+    const { data: dataEncoded, signature: signatureEncoded } = getUrlParams();
+
+    const drinkInfoElement = document.getElementById('drink-info');
+    const drinkContentElement = document.getElementById('drink-content');
+
+    if (!dataEncoded || !signatureEncoded) {
+      drinkInfoElement.innerText = 'Ingen data eller signatur tillhandahölls.';
+      return;
+    }
+
+    // Decode data and signature
+    const data = atob(decodeURIComponent(dataEncoded));
+    const signatureHex = decodeURIComponent(signatureEncoded);
+
+    // Split signature into r and s
+    const rHex = signatureHex.slice(0, 64);
+    const sHex = signatureHex.slice(64, 128);
+    const signature = { r: rHex, s: sHex };
+
+    // Verify the signature
+    const isValid = key.verify(data, signature);
+
+    if (isValid) {
+      // Parse CSV data
+      const [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber] = data.split(';');
+
+      // Update the page with the drink information
+      const contentHTML = `
+        <p class="mt-4 text-xl md:text-2xl">Du njuter av <strong>${name}</strong>!</p>
+        <p class="mt-2 text-lg">Tillverkningsdatum: ${batchDate}</p>
+        <p class="mt-1 text-lg">Batchnummer: ${batchNumber}</p>
+        <p class="mt-1 text-lg">Kvantitet: ${batchQuantity}</p>
+        <p class="mt-1 text-lg">Ingredienser: ${ingredients}</p>
+        <p class="mt-1 text-lg">Flasknummer: ${sequenceNumber}</p>
+        <div class="mt-4 flex justify-center">
+          <img src="${imageFilename}" alt="${name}" class="rounded-lg shadow-lg max-w-xs">
+        </div>
+      `;
+
+      drinkContentElement.innerHTML = contentHTML;
+
+    } else {
+      drinkInfoElement.innerText = 'Signaturverifiering misslyckades.';
+    }
+  })();
+  </script>
+</body>
+</html>
