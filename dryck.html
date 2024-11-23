@@ -36,6 +36,11 @@
       height: 100%;
       background-color: rgba(0, 0, 0, 0.5);
     }
+    /* Added styles for drink-content */
+    #drink-content {
+      margin: 1rem auto;
+      max-width: 600px;
+    }
   </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -43,8 +48,10 @@
   <section class="relative bg-cover bg-center h-screen" style="background-image: url('hero.webp');">
     <div class="overlay"></div>
     <div class="hero-text text-white">
-      <h1 class="text-4xl md:text-6xl font-bold">Huskarlar Mjöderi</h1>
-      <div id="drink-content" class="mt-6 flex flex-col md:flex-row md:items-center md:justify-center">
+      <h1 class="text-4xl md:text-6xl font-bold">
+        <a href="https://huskarlar.github.io/" class="underline text-white">Huskarlar Mjöderi</a>
+      </h1>
+      <div id="drink-content" class="flex flex-col md:flex-row md:items-center md:justify-center">
         <!-- Text Content -->
         <div class="md:w-1/2 md:pr-4">
           <div id="drink-info">
