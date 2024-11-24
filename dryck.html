@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Huskarlar Mjöderi - Dryck Information</title>
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Tailwind CSS -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
@@ -122,13 +123,16 @@
       // Parse CSV data
       const [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber] = data.split(';');
 
+      const abv = '11%'; // Hardcoded for now since data is missing
+
       // Construct the information HTML
       const infoHTML = `
         <p class="mt-4 text-xl md:text-2xl">Du njuter av <strong>${name}</strong>!</p>
         <p class="mt-2 text-lg">Tillverkningsdatum: ${batchDate}</p>
         <p class="mt-1 text-lg">Batchnummer: ${batchNumber}</p>
-        <p class="mt-1 text-lg">Kvantitet: ${batchQuantity}</p>
         <p class="mt-1 text-lg">Ingredienser: ${ingredients}</p>
+        <p class="mt-1 text-lg">ABV: ${abv}</p>
+        <p class="mt-1 text-lg">Kvantitet: ${batchQuantity}</p>
         <p class="mt-1 text-lg">Burknummer: ${sequenceNumber}</p>
       `;
 
