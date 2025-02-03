@@ -124,7 +124,7 @@
       if (parts.length === 7) {
         // Old format: name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber
         [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber] = parts;
-        abv = '11%';         // Default ABV
+        abv = '11';         // Default ABV
         labelType = 'burk';   // Default label type
       } else if (parts.length >= 9) {
         // New format: name, batchDate, batchNumber, batchQuantity, abv, ingredients, imageFilename, labelType, sequenceNumber
