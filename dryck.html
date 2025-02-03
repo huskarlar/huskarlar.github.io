@@ -37,7 +37,7 @@
       height: 100%;
       background-color: rgba(0, 0, 0, 0.5);
     }
-    /* Styles for drink-content */
+    /* Added styles for drink-content */
     #drink-content {
       margin: 1rem auto;
       max-width: 600px;
@@ -70,7 +70,7 @@
   <!-- Footer -->
   <footer class="bg-honey py-6">
     <div class="container mx-auto px-6 text-center">
-      <p class="text-mead-dark">© 2024 Huskarlar Mjöderi. Alla rättigheter förbehållna.</p>
+      <p class="text-mead-dark">© 2025 Huskarlar Mjöderi. Alla rättigheter förbehållna.</p>
     </div>
   </footer>
 
@@ -81,14 +81,12 @@
     // Paste your public key (hex format) here
     const publicKeyHex = '045a1a4c86397cb70099cdd7ee8717eb79b370f84daced8bbe5ff7b5f9995ef7047860fdce7058a11d7fee08affa8224c4467f8dee7f511594970361caac6ff9ee';
 
-    // Initialize elliptic curve
+    // Initialize elliptic curve and reconstruct public key
     const EC = window.elliptic.ec;
     const ec = new EC('secp256k1');
-
-    // Reconstruct public key
     const key = ec.keyFromPublic(publicKeyHex, 'hex');
 
-    // Function to get data and signature from URL
+    // Function to get URL parameters
     function getUrlParams() {
       const params = new URLSearchParams(window.location.search);
       return {
@@ -98,7 +96,6 @@
     }
 
     const { data: dataEncoded, signature: signatureEncoded } = getUrlParams();
-
     const drinkInfoElement = document.getElementById('drink-info');
     const drinkImageElement = document.getElementById('drink-image');
 
@@ -111,7 +108,7 @@
     const data = atob(decodeURIComponent(dataEncoded));
     const signatureHex = decodeURIComponent(signatureEncoded);
 
-    // Split signature into r and s (expecting 128 hex characters)
+    // Extract r and s from the signature (assuming 128 hex characters)
     const rHex = signatureHex.slice(0, 64);
     const sHex = signatureHex.slice(64, 128);
     const signature = { r: rHex, s: sHex };
@@ -120,23 +117,24 @@
     const isValid = key.verify(data, signature);
 
     if (isValid) {
-      // Parse CSV data
+      // Parse the CSV data. We support both old and new formats.
       const parts = data.split(';');
-      // Old format: [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber]
-      // New format: [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, ABV, labelType, sequenceNumber]
       let name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, abv, labelType, sequenceNumber;
+      
       if (parts.length === 7) {
+        // Old format: name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber
         [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber] = parts;
-        abv = '11%';         // Default ABV for old format
-        labelType = 'burk';   // Default label type for old format
+        abv = '11%';         // Default ABV
+        labelType = 'burk';   // Default label type
       } else if (parts.length >= 9) {
-        [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, abv, labelType, sequenceNumber] = parts;
+        // New format: name, batchDate, batchNumber, batchQuantity, abv, ingredients, imageFilename, labelType, sequenceNumber
+        [name, batchDate, batchNumber, batchQuantity, abv, ingredients, imageFilename, labelType, sequenceNumber] = parts;
       } else {
         drinkInfoElement.innerHTML = '<p>Ogiltigt dataformat.</p>';
         return;
       }
 
-      // Determine the label number text based on labelType
+      // Decide which label number text to use
       let labelNumberText;
       if (labelType.toLowerCase() === 'burk') {
         labelNumberText = 'Burknummer';
@@ -146,7 +144,6 @@
         labelNumberText = 'Nummer';
       }
 
-      // Construct the information HTML
       const infoHTML = `
         <p class="mt-4 text-xl md:text-2xl">Du njuter av <strong>${name}</strong>!</p>
         <p class="mt-2 text-lg">Tillverkningsdatum: ${batchDate}</p>
@@ -156,12 +153,11 @@
         <p class="mt-1 text-lg">Kvantitet: ${batchQuantity}</p>
         <p class="mt-1 text-lg">${labelNumberText}: ${sequenceNumber}</p>
       `;
-
-      // Update the drink info and image
+      
       drinkInfoElement.innerHTML = infoHTML;
       drinkImageElement.src = imageFilename;
       drinkImageElement.alt = name;
-
+      
     } else {
       drinkInfoElement.innerHTML = '<p>Signaturverifiering misslyckades.</p>';
     }
