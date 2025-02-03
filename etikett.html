@@ -15,16 +15,48 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
-    /* The preview canvas is rotated 90° and given a margin so it doesn’t overlap other UI elements */
+    /* The preview canvas is rotated 90° and given a margin */
     #preview-canvas {
       border: 1px solid #ccc;
       display: block;
       margin: calc(297px / 4) auto;
       transform: rotate(90deg);
     }
+    /* Loading overlay styles */
+    #loadingOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 9999;
+      display: none;
+    }
+    #loadingOverlay .spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #3498db;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
   </style>
 </head>
 <body class="bg-gray-100 font-sans p-6">
+  <!-- Loading overlay -->
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+  </div>
+  
   <h1 class="text-3xl font-bold text-center">QR Label Generator – PDF Zip Export</h1>
   
   <!-- Generation Form -->
@@ -49,6 +81,12 @@
     
     <label for="imageFilename">Image Filename (Path):</label>
     <input type="text" id="imageFilename" class="w-full p-2 border" required><br><br>
+    
+    <label for="labelType">Label Type:</label>
+    <select id="labelType" class="w-full p-2 border">
+      <option value="burk">Burk</option>
+      <option value="flaska">Flaska</option>
+    </select><br><br>
     
     <label for="sequenceNumber">Number of Labels:</label>
     <input type="number" id="sequenceNumber" class="w-full p-2 border" min="1" required><br><br>
@@ -118,6 +156,14 @@
     // Utility: Sleep function
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     
+    // Utility: Show/Hide loading overlay
+    function showLoading() {
+      document.getElementById("loadingOverlay").style.display = "block";
+    }
+    function hideLoading() {
+      document.getElementById("loadingOverlay").style.display = "none";
+    }
+    
     // Utility: Select background image and return its data URL
     function selectBackgroundImage() {
       return new Promise((resolve, reject) => {
@@ -150,6 +196,7 @@
     // ------------------ Generation Form: Generate Short URLs ------------------
     document.getElementById('generate-form').addEventListener('submit', async function(e) {
       e.preventDefault();
+      showLoading();
       const name = document.getElementById('inputData').value;
       const batchDate = document.getElementById('batchDate').value;
       const batchNumber = document.getElementById('batchNumber').value;
@@ -157,16 +204,19 @@
       const ingredients = document.getElementById('ingredients').value;
       const abv = document.getElementById('abv').value;
       const imageFilename = document.getElementById('imageFilename').value;
+      const labelType = document.getElementById('labelType').value; // new dropdown value
       const numLabels = parseInt(document.getElementById('sequenceNumber').value);
       const privateKeyInput = document.getElementById('privateKey').value.trim();
       const tinyurlApiKey = document.getElementById('tinyurlApiKey').value.trim();
       
       if (!privateKeyInput) {
         alert('Please enter your private key.');
+        hideLoading();
         return;
       }
       if (!tinyurlApiKey) {
         alert('Please enter your TinyURL API key.');
+        hideLoading();
         return;
       }
       
@@ -175,25 +225,26 @@
         keyPair = ec.keyFromPrivate(privateKeyInput, 'hex');
       } catch (error) {
         alert('Invalid private key.');
+        hideLoading();
         return;
       }
       
       const urls = [];
       for (let i = 1; i <= numLabels; i++) {
-        const data = `${name};${batchDate};${batchNumber};${batchQuantity};${abv};${ingredients};${imageFilename};${i}`;
+        // Include labelType in the encrypted data
+        const data = `${name};${batchDate};${batchNumber};${batchQuantity};${abv};${ingredients};${imageFilename};${labelType};${i}`;
         const signature = keyPair.sign(data);
         const signatureHex = signature.r.toString('hex') + signature.s.toString('hex');
         const encodedData = encodeURIComponent(btoa(data));
         const encodedSignature = encodeURIComponent(signatureHex);
         const longUrl = `https://huskarlar.github.io/dryck.html?data=${encodedData}&signature=${encodedSignature}`;
         
-        // Shorten URL using TinyURL API.
         const shortUrl = await shortenUrl(longUrl, tinyurlApiKey);
         urls.push(shortUrl);
-        // Wait 1 second between API calls.
         await sleep(1000);
       }
       document.getElementById('output').value = urls.join('\n');
+      hideLoading();
     });
     
     async function shortenUrl(longUrl, apiKey) {
@@ -217,7 +268,7 @@
         return result.data.tiny_url;
       } catch (error) {
         console.error('Error shortening URL:', error);
-        return longUrl; // Fallback if API fails.
+        return longUrl;
       }
     }
     
@@ -270,7 +321,6 @@
     }
     
     async function drawPreviewElements(ctx, currentScale) {
-      // Draw dummy QR code using "DUMMY"
       const dummyURL = "DUMMY";
       const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
       const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
@@ -317,7 +367,6 @@
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
         }
-        // For preview, use previewScale for font size conversion:
         ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + (fontSize * 1.333) + "px " + fontFamily;
         ctx.fillText(text, 0, 0);
         ctx.restore();
@@ -423,7 +472,7 @@
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
-          // Translate to bottom-right and then scale by -1 in both directions
+          // Translate to bottom-right and scale by -1 in both directions.
           ctx.translate(width, height);
           ctx.scale(-1, -1);
           ctx.drawImage(img, 0, 0, width, height);
@@ -436,12 +485,10 @@
     // ------------------ Generate Label Image for PDF (High Resolution) ------------------
     async function generateLabelImage(url) {
       const canvas = document.createElement('canvas');
-      // Use the higher resolution scale for PDF generation.
       canvas.width = labelWidth * pdfScale;
       canvas.height = labelHeight * pdfScale;
       const ctx = canvas.getContext('2d');
       
-      // Draw background image (or white with border if none)
       if (window.backgroundImgData) {
         await new Promise(resolve => {
           const bgImg = new Image();
@@ -458,7 +505,6 @@
         ctx.strokeRect(0, 0, canvas.width, canvas.height);
       }
       
-      // QR code settings (positions/dimensions multiplied by pdfScale)
       const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
       const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
       const qrOffsetY = parseFloat(document.getElementById('qrOffsetY').value) || ((labelHeight - qrSize) / 2);
@@ -482,8 +528,6 @@
       }
       
       // Draw text overlays.
-      // Positions multiplied by pdfScale; font size is computed using previewScale conversion,
-      // then scaled by (pdfScale/previewScale) so that after downscaling, the text appears the same.
       const container = document.getElementById('text-overlays-container');
       const overlays = container.querySelectorAll('.text-overlay');
       overlays.forEach(overlay => {
@@ -509,7 +553,7 @@
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
         }
-        // Use preview text size conversion (fontSize * 1.333) and scale by (pdfScale/previewScale)
+        // Use preview text size conversion (fontSize * 1.333) scaled by (pdfScale/previewScale)
         const scaledFontSize = fontSize * 1.333 * (pdfScale / previewScale);
         ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + scaledFontSize + "px " + fontFamily;
         ctx.fillText(text, 0, 0);
@@ -521,16 +565,17 @@
     
     // ------------------ PDF Generation: Create PDFs and Zip Them ------------------
     async function createLabelsPdfs() {
+      showLoading();
       let urls = document.getElementById('output').value
         .split('\n')
         .map(u => u.trim())
         .filter(u => u !== "");
       if (urls.length === 0) {
         alert("No URLs found. Please generate short URLs first.");
+        hideLoading();
         return;
       }
       
-      // If "Randomize Order" is checked, shuffle the array.
       if (document.getElementById('randomize').checked) {
         for (let i = urls.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -538,7 +583,6 @@
         }
       }
       
-      // Split the urls into groups of up to 8 (since 8 labels per A4 page)
       const groups = [];
       for (let i = 0; i < urls.length; i += 8) {
         groups.push(urls.slice(i, i + 8));
@@ -547,11 +591,9 @@
       const { jsPDF } = window.jspdf;
       const zip = new JSZip();
       
-      // Process each group and create a PDF
       for (let g = 0; g < groups.length; g++) {
         const group = groups[g];
         const doc = new jsPDF({ unit: "mm", format: "a4" });
-        // For each label in the group:
         for (let i = 0; i < group.length; i++) {
           if (i > 0 && i % 8 === 0) {
             doc.addPage();
@@ -562,22 +604,20 @@
           const labelX = col * labelWidth;
           const labelY = row * labelHeight;
           
-          // Generate the high-res label image for this URL.
           let labelDataUrl = await generateLabelImage(group[i]);
-          // If this label is in the first column (col === 0), flip it horizontally and vertically.
+          // For labels in the first column, flip both horizontally and vertically.
           if (col === 0) {
             labelDataUrl = await flipImageBoth(labelDataUrl, labelWidth * pdfScale, labelHeight * pdfScale);
           }
           doc.addImage(labelDataUrl, "PNG", labelX, labelY, labelWidth, labelHeight);
         }
-        // Get PDF data as an ArrayBuffer and add to zip.
         const pdfData = doc.output("arraybuffer");
         zip.file(`labels_part${g + 1}.pdf`, pdfData);
       }
       
-      // Generate the zip file and trigger a download.
       zip.generateAsync({ type: "blob" }).then(function(content) {
         saveAs(content, "labels.zip");
+        hideLoading();
       });
     }
     
