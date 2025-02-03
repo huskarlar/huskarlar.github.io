@@ -37,7 +37,7 @@
       height: 100%;
       background-color: rgba(0, 0, 0, 0.5);
     }
-    /* Added styles for drink-content */
+    /* Styles for drink-content */
     #drink-content {
       margin: 1rem auto;
       max-width: 600px;
@@ -111,7 +111,7 @@
     const data = atob(decodeURIComponent(dataEncoded));
     const signatureHex = decodeURIComponent(signatureEncoded);
 
-    // Split signature into r and s
+    // Split signature into r and s (expecting 128 hex characters)
     const rHex = signatureHex.slice(0, 64);
     const sHex = signatureHex.slice(64, 128);
     const signature = { r: rHex, s: sHex };
@@ -121,9 +121,30 @@
 
     if (isValid) {
       // Parse CSV data
-      const [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber] = data.split(';');
+      const parts = data.split(';');
+      // Old format: [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber]
+      // New format: [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, ABV, labelType, sequenceNumber]
+      let name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, abv, labelType, sequenceNumber;
+      if (parts.length === 7) {
+        [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, sequenceNumber] = parts;
+        abv = '11%';         // Default ABV for old format
+        labelType = 'burk';   // Default label type for old format
+      } else if (parts.length >= 9) {
+        [name, batchDate, batchNumber, batchQuantity, ingredients, imageFilename, abv, labelType, sequenceNumber] = parts;
+      } else {
+        drinkInfoElement.innerHTML = '<p>Ogiltigt dataformat.</p>';
+        return;
+      }
 
-      const abv = '11%'; // Hardcoded for now since data is missing
+      // Determine the label number text based on labelType
+      let labelNumberText;
+      if (labelType.toLowerCase() === 'burk') {
+        labelNumberText = 'Burknummer';
+      } else if (labelType.toLowerCase() === 'flaska') {
+        labelNumberText = 'Flasknummer';
+      } else {
+        labelNumberText = 'Nummer';
+      }
 
       // Construct the information HTML
       const infoHTML = `
@@ -133,13 +154,11 @@
         <p class="mt-1 text-lg">Ingredienser: ${ingredients}</p>
         <p class="mt-1 text-lg">ABV: ${abv}</p>
         <p class="mt-1 text-lg">Kvantitet: ${batchQuantity}</p>
-        <p class="mt-1 text-lg">Burknummer: ${sequenceNumber}</p>
+        <p class="mt-1 text-lg">${labelNumberText}: ${sequenceNumber}</p>
       `;
 
-      // Update the drink info
+      // Update the drink info and image
       drinkInfoElement.innerHTML = infoHTML;
-
-      // Update the image
       drinkImageElement.src = imageFilename;
       drinkImageElement.alt = name;
 
