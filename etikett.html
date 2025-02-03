@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Label Generator – PDF Zip Export</title>
+  <!-- Include elliptic library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
+  <!-- Include QRCode library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Include Tailwind CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <!-- Include jsPDF (UMD build) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Include JSZip and FileSaver -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    /* The preview canvas is rotated 90° and given a margin so it doesn’t overlap other UI elements */
+    #preview-canvas {
+      border: 1px solid #ccc;
+      display: block;
+      margin: calc(297px / 4) auto;
+      transform: rotate(90deg);
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans p-6">
+  <h1 class="text-3xl font-bold text-center">QR Label Generator – PDF Zip Export</h1>
+  
+  <!-- Generation Form -->
+  <form id="generate-form" class="max-w-lg mx-auto mt-6">
+    <label for="inputData">Name:</label>
+    <input type="text" id="inputData" class="w-full p-2 border" required><br><br>
+    
+    <label for="batchDate">Batch Date:</label>
+    <input type="date" id="batchDate" class="w-full p-2 border" required><br><br>
+    
+    <label for="batchNumber">Batch Number:</label>
+    <input type="number" id="batchNumber" class="w-full p-2 border" required><br><br>
+    
+    <label for="batchQuantity">Batch Quantity:</label>
+    <input type="text" id="batchQuantity" class="w-full p-2 border" required><br><br>
+    
+    <label for="ingredients">Ingredients (comma separated):</label>
+    <input type="text" id="ingredients" class="w-full p-2 border" required><br><br>
+    
+    <label for="abv">ABV (%):</label>
+    <input type="text" id="abv" class="w-full p-2 border" required><br><br>
+    
+    <label for="imageFilename">Image Filename (Path):</label>
+    <input type="text" id="imageFilename" class="w-full p-2 border" required><br><br>
+    
+    <label for="sequenceNumber">Number of Labels:</label>
+    <input type="number" id="sequenceNumber" class="w-full p-2 border" min="1" required><br><br>
+    
+    <label for="privateKey">Private Key (Hex):</label>
+    <textarea id="privateKey" class="w-full p-2 border" rows="4" required></textarea><br><br>
+    
+    <!-- TinyURL API Key -->
+    <label for="tinyurlApiKey">TinyURL API Key:</label>
+    <input type="text" id="tinyurlApiKey" class="w-full p-2 border" required><br><br>
+    
+    <input type="submit" value="Generate Short URLs" class="bg-blue-500 text-white p-2 w-full cursor-pointer">
+  </form>
+  
+  <h3 class="text-lg font-bold mt-6">Generated Short URLs:</h3>
+  <textarea id="output" class="w-full p-2 border" rows="10"></textarea><br>
+  <label><input type="checkbox" id="randomize"> Randomize Order</label>
+  
+  <!-- Preview Controls -->
+  <div id="preview-controls" class="max-w-lg mx-auto mt-6">
+    <h3 class="text-lg font-bold">QR Code Settings</h3>
+    <label for="qrOffsetX">QR Code X Offset (mm):</label>
+    <input type="number" id="qrOffsetX" value="32.5" min="0" max="105" class="w-full p-2 border"><br><br>
+    <label for="qrOffsetY">QR Code Y Offset (mm):</label>
+    <input type="number" id="qrOffsetY" value="17" min="0" max="74.25" class="w-full p-2 border"><br><br>
+    <label for="qrSize">QR Code Size (mm):</label>
+    <input type="number" id="qrSize" value="40" min="10" max="105" class="w-full p-2 border"><br><br>
+    <button id="center-qr" class="bg-indigo-500 text-white p-2 w-full cursor-pointer">Center QR Code</button><br><br>
+    <button id="select-preview-bg" class="bg-purple-500 text-white p-2 w-full cursor-pointer">Select Background Image for Preview</button>
+  </div>
+  
+  <!-- Text Overlays Section -->
+  <div id="text-overlays-section" class="max-w-lg mx-auto mt-6">
+    <h3 class="text-lg font-bold">Text Overlays</h3>
+    <div id="text-overlays-container"></div>
+    <button id="add-text-overlay" class="bg-purple-500 text-white p-2 w-full mt-2 cursor-pointer">Add Text Overlay</button>
+  </div>
+  
+  <!-- Preview Canvas -->
+  <div class="max-w-lg mx-auto mt-6">
+    <h3 class="text-lg font-bold">Label Preview (rotated 90°)</h3>
+    <!-- The label is 105 x 74.25 mm; preview uses a scale of 4 (1 mm = 4 px) -->
+    <canvas id="preview-canvas" width="420" height="297"></canvas>
+  </div>
+  
+  <!-- Generate PDF Button -->
+  <button id="create-labels" class="bg-green-500 text-white p-2 mt-4 w-full cursor-pointer">
+    Create Labels (Generate ZIP)
+  </button>
+  
+  <script>
+  (function() {
+    const EC = window.elliptic.ec;
+    const ec = new EC('secp256k1');
+    // Global background image data (Data URL)
+    window.backgroundImgData = null;
+    
+    // Label dimensions in mm
+    const labelWidth = 105;
+    const labelHeight = 74.25;
+    // Scale factors:
+    // Preview uses 1 mm = 4 px.
+    const previewScale = 4;
+    // PDF generation uses a higher resolution (e.g. 1 mm = 8 px).
+    const pdfScale = 8;
+    
+    // Utility: Sleep function
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    
+    // Utility: Select background image and return its data URL
+    function selectBackgroundImage() {
+      return new Promise((resolve, reject) => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+        fileInput.addEventListener('change', function(event) {
+          const file = event.target.files[0];
+          if (!file) {
+            reject('No file selected.');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            resolve(e.target.result);
+            fileInput.remove();
+          };
+          reader.onerror = function(err) {
+            reject(err);
+            fileInput.remove();
+          };
+          reader.readAsDataURL(file);
+        });
+        fileInput.click();
+      });
+    }
+    
+    // ------------------ Generation Form: Generate Short URLs ------------------
+    document.getElementById('generate-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const name = document.getElementById('inputData').value;
+      const batchDate = document.getElementById('batchDate').value;
+      const batchNumber = document.getElementById('batchNumber').value;
+      const batchQuantity = document.getElementById('batchQuantity').value;
+      const ingredients = document.getElementById('ingredients').value;
+      const abv = document.getElementById('abv').value;
+      const imageFilename = document.getElementById('imageFilename').value;
+      const numLabels = parseInt(document.getElementById('sequenceNumber').value);
+      const privateKeyInput = document.getElementById('privateKey').value.trim();
+      const tinyurlApiKey = document.getElementById('tinyurlApiKey').value.trim();
+      
+      if (!privateKeyInput) {
+        alert('Please enter your private key.');
+        return;
+      }
+      if (!tinyurlApiKey) {
+        alert('Please enter your TinyURL API key.');
+        return;
+      }
+      
+      let keyPair;
+      try {
+        keyPair = ec.keyFromPrivate(privateKeyInput, 'hex');
+      } catch (error) {
+        alert('Invalid private key.');
+        return;
+      }
+      
+      const urls = [];
+      for (let i = 1; i <= numLabels; i++) {
+        const data = `${name};${batchDate};${batchNumber};${batchQuantity};${abv};${ingredients};${imageFilename};${i}`;
+        const signature = keyPair.sign(data);
+        const signatureHex = signature.r.toString('hex') + signature.s.toString('hex');
+        const encodedData = encodeURIComponent(btoa(data));
+        const encodedSignature = encodeURIComponent(signatureHex);
+        const longUrl = `https://huskarlar.github.io/dryck.html?data=${encodedData}&signature=${encodedSignature}`;
+        
+        // Shorten URL using TinyURL API.
+        const shortUrl = await shortenUrl(longUrl, tinyurlApiKey);
+        urls.push(shortUrl);
+        // Wait 1 second between API calls.
+        await sleep(1000);
+      }
+      document.getElementById('output').value = urls.join('\n');
+    });
+    
+    async function shortenUrl(longUrl, apiKey) {
+      try {
+        const response = await fetch('https://api.tinyurl.com/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            "url": longUrl,
+            "domain": "tinyurl.com",
+            "alias": "",
+            "tags": "",
+            "expires_at": "",
+            "description": ""
+          })
+        });
+        const result = await response.json();
+        return result.data.tiny_url;
+      } catch (error) {
+        console.error('Error shortening URL:', error);
+        return longUrl; // Fallback if API fails.
+      }
+    }
+    
+    // ------------------ Helper: Generate QR Code as Data URL ------------------
+    function generateQRCodeDataURL(url, size = 200) {
+      return new Promise((resolve, reject) => {
+        const tempDiv = document.createElement('div');
+        new QRCode(tempDiv, {
+          text: url,
+          width: size,
+          height: size,
+          correctLevel: QRCode.CorrectLevel.L
+        });
+        setTimeout(() => {
+          const qrCanvas = tempDiv.querySelector('canvas');
+          if (qrCanvas) {
+            resolve(qrCanvas.toDataURL("image/png"));
+          } else {
+            const qrImg = tempDiv.querySelector('img');
+            if (qrImg) {
+              resolve(qrImg.src);
+            } else {
+              reject("QR code generation failed.");
+            }
+          }
+        }, 200);
+      });
+    }
+    
+    // ------------------ Preview: Update the Preview Canvas ------------------
+    async function updatePreview() {
+      const previewCanvas = document.getElementById('preview-canvas');
+      const ctx = previewCanvas.getContext('2d');
+      ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      
+      if (window.backgroundImgData) {
+        const bgImg = new Image();
+        bgImg.onload = function() {
+          ctx.drawImage(bgImg, 0, 0, previewCanvas.width, previewCanvas.height);
+          drawPreviewElements(ctx, previewScale);
+        };
+        bgImg.src = window.backgroundImgData;
+      } else {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+        ctx.strokeStyle = "#000";
+        ctx.strokeRect(0, 0, previewCanvas.width, previewCanvas.height);
+        drawPreviewElements(ctx, previewScale);
+      }
+    }
+    
+    async function drawPreviewElements(ctx, currentScale) {
+      // Draw dummy QR code using "DUMMY"
+      const dummyURL = "DUMMY";
+      const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
+      const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
+      const qrOffsetY = parseFloat(document.getElementById('qrOffsetY').value) || ((labelHeight - qrSize) / 2);
+      
+      let qrDataUrl;
+      try {
+        qrDataUrl = await generateQRCodeDataURL(dummyURL, qrSize * currentScale);
+      } catch (err) {
+        console.error(err);
+        return;
+      }
+      const qrImg = new Image();
+      qrImg.onload = function() {
+        ctx.drawImage(qrImg, qrOffsetX * currentScale, qrOffsetY * currentScale, qrSize * currentScale, qrSize * currentScale);
+        drawTextOverlays(ctx, currentScale);
+      };
+      qrImg.src = qrDataUrl;
+    }
+    
+    function drawTextOverlays(ctx, currentScale) {
+      const container = document.getElementById('text-overlays-container');
+      const overlays = container.querySelectorAll('.text-overlay');
+      overlays.forEach(overlay => {
+        const text = overlay.querySelector('.overlay-text').value;
+        const x = parseFloat(overlay.querySelector('.overlay-x').value) || 0;
+        const y = parseFloat(overlay.querySelector('.overlay-y').value) || 0;
+        const fontSize = parseFloat(overlay.querySelector('.overlay-font-size').value) || 12;
+        const fontFamily = overlay.querySelector('.overlay-font-family').value || "Arial";
+        const color = overlay.querySelector('.overlay-color').value || "#000000";
+        const rotate = parseFloat(overlay.querySelector('.overlay-rotate').value) || 0;
+        const italic = overlay.querySelector('.overlay-italic').checked;
+        const bold = overlay.querySelector('.overlay-bold').checked;
+        const centered = overlay.querySelector('.overlay-centered').checked;
+        
+        ctx.save();
+        ctx.translate(x * currentScale, y * currentScale);
+        ctx.rotate(rotate * Math.PI / 180);
+        ctx.fillStyle = color;
+        if (centered) {
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+        } else {
+          ctx.textAlign = "left";
+          ctx.textBaseline = "top";
+        }
+        // For preview, use previewScale for font size conversion:
+        ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + (fontSize * 1.333) + "px " + fontFamily;
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+      });
+    }
+    
+    // ------------------ Dynamic Preview Update ------------------
+    const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize'];
+    previewInputs.forEach(id => {
+      document.getElementById(id).addEventListener('input', updatePreview);
+    });
+    document.getElementById('generate-form').addEventListener('input', updatePreview);
+    document.getElementById('text-overlays-container').addEventListener('input', updatePreview);
+    updatePreview();
+    
+    // ------------------ QR Code Center Button ------------------
+    document.getElementById('center-qr').addEventListener('click', function(e) {
+      e.preventDefault();
+      const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
+      document.getElementById('qrOffsetX').value = ((labelWidth - qrSize) / 2).toFixed(2);
+      document.getElementById('qrOffsetY').value = ((labelHeight - qrSize) / 2).toFixed(2);
+      updatePreview();
+    });
+    
+    // ------------------ Background Image Selection ------------------
+    document.getElementById('select-preview-bg').addEventListener('click', async function(e) {
+      e.preventDefault();
+      try {
+        window.backgroundImgData = await selectBackgroundImage();
+        updatePreview();
+      } catch (err) {
+        console.error(err);
+      }
+    });
+    
+    // ------------------ Text Overlays Management ------------------
+    document.getElementById('add-text-overlay').addEventListener('click', function(e) {
+      e.preventDefault();
+      addTextOverlay({
+        text: "Sample Text",
+        x: 5,
+        y: 5,
+        fontSize: 12,
+        fontFamily: "Arial",
+        color: "#000000",
+        rotate: 0,
+        italic: false,
+        bold: false,
+        centered: false
+      });
+      updatePreview();
+    });
+    
+    function addTextOverlay(config) {
+      const container = document.getElementById('text-overlays-container');
+      const overlayDiv = document.createElement('div');
+      overlayDiv.className = "text-overlay border p-2 my-2";
+      overlayDiv.innerHTML = `
+        <label>Text:</label>
+        <input type="text" class="overlay-text w-full p-1 border" value="${config.text}"><br>
+        <label>X Offset (mm):</label>
+        <input type="number" class="overlay-x w-full p-1 border" value="${config.x}"><br>
+        <label>Y Offset (mm):</label>
+        <input type="number" class="overlay-y w-full p-1 border" value="${config.y}"><br>
+        <label>Font Size (pt):</label>
+        <input type="number" class="overlay-font-size w-full p-1 border" value="${config.fontSize}"><br>
+        <label>Font Family:</label>
+        <input type="text" class="overlay-font-family w-full p-1 border" value="${config.fontFamily}"><br>
+        <label>Color:</label>
+        <input type="color" class="overlay-color w-full p-1 border" value="${config.color}"><br>
+        <label>Rotate (degrees):</label>
+        <input type="number" class="overlay-rotate w-full p-1 border" value="${config.rotate}"><br>
+        <label><input type="checkbox" class="overlay-italic" ${config.italic ? "checked" : ""}> Italic</label>
+        <label><input type="checkbox" class="overlay-bold" ${config.bold ? "checked" : ""}> Bold</label>
+        <label><input type="checkbox" class="overlay-centered" ${config.centered ? "checked" : ""}> Centered</label><br>
+        <button class="center-text bg-indigo-500 text-white p-1 mt-1">Center Text</button>
+        <button class="remove-text bg-red-500 text-white p-1 mt-1">Remove</button>
+      `;
+      overlayDiv.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', updatePreview);
+      });
+      overlayDiv.querySelector('.center-text').addEventListener('click', function(e) {
+        e.preventDefault();
+        overlayDiv.querySelector('.overlay-x').value = (labelWidth / 2).toFixed(2);
+        overlayDiv.querySelector('.overlay-y').value = (labelHeight / 2).toFixed(2);
+        overlayDiv.querySelector('.overlay-centered').checked = true;
+        updatePreview();
+      });
+      overlayDiv.querySelector('.remove-text').addEventListener('click', function(e) {
+        e.preventDefault();
+        overlayDiv.remove();
+        updatePreview();
+      });
+      container.appendChild(overlayDiv);
+    }
+    
+    // ------------------ Helper: Flip an Image Both Horizontally and Vertically ------------------
+    function flipImageBoth(dataUrl, width, height) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          // Translate to bottom-right and then scale by -1 in both directions
+          ctx.translate(width, height);
+          ctx.scale(-1, -1);
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.src = dataUrl;
+      });
+    }
+    
+    // ------------------ Generate Label Image for PDF (High Resolution) ------------------
+    async function generateLabelImage(url) {
+      const canvas = document.createElement('canvas');
+      // Use the higher resolution scale for PDF generation.
+      canvas.width = labelWidth * pdfScale;
+      canvas.height = labelHeight * pdfScale;
+      const ctx = canvas.getContext('2d');
+      
+      // Draw background image (or white with border if none)
+      if (window.backgroundImgData) {
+        await new Promise(resolve => {
+          const bgImg = new Image();
+          bgImg.onload = function() {
+            ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+            resolve();
+          };
+          bgImg.src = window.backgroundImgData;
+        });
+      } else {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = "#000";
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+      }
+      
+      // QR code settings (positions/dimensions multiplied by pdfScale)
+      const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
+      const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
+      const qrOffsetY = parseFloat(document.getElementById('qrOffsetY').value) || ((labelHeight - qrSize) / 2);
+      
+      let qrDataUrl;
+      try {
+        qrDataUrl = await generateQRCodeDataURL(url, qrSize * pdfScale);
+      } catch (err) {
+        console.error("Error generating QR code:", err);
+        qrDataUrl = "";
+      }
+      if (qrDataUrl) {
+        await new Promise(resolve => {
+          const qrImg = new Image();
+          qrImg.onload = function() {
+            ctx.drawImage(qrImg, qrOffsetX * pdfScale, qrOffsetY * pdfScale, qrSize * pdfScale, qrSize * pdfScale);
+            resolve();
+          };
+          qrImg.src = qrDataUrl;
+        });
+      }
+      
+      // Draw text overlays.
+      // Positions multiplied by pdfScale; font size is computed using previewScale conversion,
+      // then scaled by (pdfScale/previewScale) so that after downscaling, the text appears the same.
+      const container = document.getElementById('text-overlays-container');
+      const overlays = container.querySelectorAll('.text-overlay');
+      overlays.forEach(overlay => {
+        const text = overlay.querySelector('.overlay-text').value;
+        const x = parseFloat(overlay.querySelector('.overlay-x').value) || 0;
+        const y = parseFloat(overlay.querySelector('.overlay-y').value) || 0;
+        const fontSize = parseFloat(overlay.querySelector('.overlay-font-size').value) || 12;
+        const fontFamily = overlay.querySelector('.overlay-font-family').value || "Arial";
+        const color = overlay.querySelector('.overlay-color').value || "#000000";
+        const rotate = parseFloat(overlay.querySelector('.overlay-rotate').value) || 0;
+        const italic = overlay.querySelector('.overlay-italic').checked;
+        const bold = overlay.querySelector('.overlay-bold').checked;
+        const centered = overlay.querySelector('.overlay-centered').checked;
+        
+        ctx.save();
+        ctx.translate(x * pdfScale, y * pdfScale);
+        ctx.rotate(rotate * Math.PI / 180);
+        ctx.fillStyle = color;
+        if (centered) {
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+        } else {
+          ctx.textAlign = "left";
+          ctx.textBaseline = "top";
+        }
+        // Use preview text size conversion (fontSize * 1.333) and scale by (pdfScale/previewScale)
+        const scaledFontSize = fontSize * 1.333 * (pdfScale / previewScale);
+        ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + scaledFontSize + "px " + fontFamily;
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+      });
+      
+      return canvas.toDataURL("image/png");
+    }
+    
+    // ------------------ PDF Generation: Create PDFs and Zip Them ------------------
+    async function createLabelsPdfs() {
+      let urls = document.getElementById('output').value
+        .split('\n')
+        .map(u => u.trim())
+        .filter(u => u !== "");
+      if (urls.length === 0) {
+        alert("No URLs found. Please generate short URLs first.");
+        return;
+      }
+      
+      // If "Randomize Order" is checked, shuffle the array.
+      if (document.getElementById('randomize').checked) {
+        for (let i = urls.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [urls[i], urls[j]] = [urls[j], urls[i]];
+        }
+      }
+      
+      // Split the urls into groups of up to 8 (since 8 labels per A4 page)
+      const groups = [];
+      for (let i = 0; i < urls.length; i += 8) {
+        groups.push(urls.slice(i, i + 8));
+      }
+      
+      const { jsPDF } = window.jspdf;
+      const zip = new JSZip();
+      
+      // Process each group and create a PDF
+      for (let g = 0; g < groups.length; g++) {
+        const group = groups[g];
+        const doc = new jsPDF({ unit: "mm", format: "a4" });
+        // For each label in the group:
+        for (let i = 0; i < group.length; i++) {
+          if (i > 0 && i % 8 === 0) {
+            doc.addPage();
+          }
+          const labelIndexOnPage = i % 8;
+          const col = labelIndexOnPage % 2;
+          const row = Math.floor(labelIndexOnPage / 2);
+          const labelX = col * labelWidth;
+          const labelY = row * labelHeight;
+          
+          // Generate the high-res label image for this URL.
+          let labelDataUrl = await generateLabelImage(group[i]);
+          // If this label is in the first column (col === 0), flip it horizontally and vertically.
+          if (col === 0) {
+            labelDataUrl = await flipImageBoth(labelDataUrl, labelWidth * pdfScale, labelHeight * pdfScale);
+          }
+          doc.addImage(labelDataUrl, "PNG", labelX, labelY, labelWidth, labelHeight);
+        }
+        // Get PDF data as an ArrayBuffer and add to zip.
+        const pdfData = doc.output("arraybuffer");
+        zip.file(`labels_part${g + 1}.pdf`, pdfData);
+      }
+      
+      // Generate the zip file and trigger a download.
+      zip.generateAsync({ type: "blob" }).then(function(content) {
+        saveAs(content, "labels.zip");
+      });
+    }
+    
+    document.getElementById('create-labels').addEventListener('click', function() {
+      createLabelsPdfs();
+    });
+    
+  })();
+  </script>
+</body>
+</html>
