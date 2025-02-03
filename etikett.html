@@ -15,7 +15,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
-    /* The preview canvas is rotated 90° and given a margin */
+    /* The preview canvas is rotated 90° and given a margin so it doesn’t overlap other UI elements */
     #preview-canvas {
       border: 1px solid #ccc;
       display: block;
@@ -82,14 +82,20 @@
     <label for="imageFilename">Image Filename (Path):</label>
     <input type="text" id="imageFilename" class="w-full p-2 border" required><br><br>
     
+    <!-- New Dropdown for Label Type -->
     <label for="labelType">Label Type:</label>
     <select id="labelType" class="w-full p-2 border">
-      <option value="burk">Burk</option>
-      <option value="flaska">Flaska</option>
+      <option value="burk">burk</option>
+      <option value="flaska">flaska</option>
     </select><br><br>
     
+    <!-- Number of Labels -->
     <label for="sequenceNumber">Number of Labels:</label>
     <input type="number" id="sequenceNumber" class="w-full p-2 border" min="1" required><br><br>
+    
+    <!-- New Input for Starting Sequence Number -->
+    <label for="startingSequence">Starting Sequence Number:</label>
+    <input type="number" id="startingSequence" class="w-full p-2 border" value="1" required><br><br>
     
     <label for="privateKey">Private Key (Hex):</label>
     <textarea id="privateKey" class="w-full p-2 border" rows="4" required></textarea><br><br>
@@ -204,8 +210,9 @@
       const ingredients = document.getElementById('ingredients').value;
       const abv = document.getElementById('abv').value;
       const imageFilename = document.getElementById('imageFilename').value;
-      const labelType = document.getElementById('labelType').value; // new dropdown value
+      const labelType = document.getElementById('labelType').value;
       const numLabels = parseInt(document.getElementById('sequenceNumber').value);
+      const startingSequence = parseInt(document.getElementById('startingSequence').value) || 1;
       const privateKeyInput = document.getElementById('privateKey').value.trim();
       const tinyurlApiKey = document.getElementById('tinyurlApiKey').value.trim();
       
@@ -230,9 +237,10 @@
       }
       
       const urls = [];
-      for (let i = 1; i <= numLabels; i++) {
-        // Include labelType in the encrypted data
-        const data = `${name};${batchDate};${batchNumber};${batchQuantity};${abv};${ingredients};${imageFilename};${labelType};${i}`;
+      // Use a zero-based loop and add startingSequence to each index.
+      for (let i = 0; i < numLabels; i++) {
+        const sequence = startingSequence + i;
+        const data = `${name};${batchDate};${batchNumber};${batchQuantity};${abv};${ingredients};${imageFilename};${labelType};${sequence}`;
         const signature = keyPair.sign(data);
         const signatureHex = signature.r.toString('hex') + signature.s.toString('hex');
         const encodedData = encodeURIComponent(btoa(data));
@@ -553,7 +561,6 @@
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
         }
-        // Use preview text size conversion (fontSize * 1.333) scaled by (pdfScale/previewScale)
         const scaledFontSize = fontSize * 1.333 * (pdfScale / previewScale);
         ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + scaledFontSize + "px " + fontFamily;
         ctx.fillText(text, 0, 0);
