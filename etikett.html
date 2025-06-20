@@ -147,6 +147,7 @@
       <option value="8">8</option>
     </select>
     <label class="block mb-2"><input type="checkbox" id="showMargin"> Show Margin Overlay</label>
+    <label class="block mb-2"><input type="checkbox" id="previewAll"> Preview Entire Sheet</label>
     <h3 class="text-lg font-bold">Label Preview</h3>
     <!-- The label is 105 x 74.25 mm; preview uses a scale of 4 (1 mm = 4 px) -->
     <canvas id="preview-canvas" width="420" height="297"></canvas>
@@ -167,6 +168,8 @@
     // Label dimensions in mm
     const labelWidth = 105;
     const labelHeight = 74.25;
+    const a4Width = 210;
+    const a4Height = 297;
     // Scale factors:
     // Preview uses 1 mm = 4 px.
     const previewScale = 4;
@@ -324,24 +327,47 @@
     async function updatePreview() {
       const previewCanvas = document.getElementById('preview-canvas');
       const ctx = previewCanvas.getContext('2d');
+      const showAll = document.getElementById('previewAll').checked;
       ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-      const labelIndex = parseInt(document.getElementById('previewLabel').value) || 1;
-      const rotation = labelIndex <= 4 ? -90 : 90;
-      previewCanvas.style.transform = `rotate(${rotation}deg)`;
-      
-      if (window.backgroundImgData) {
-        const bgImg = new Image();
-        bgImg.onload = function() {
-          ctx.drawImage(bgImg, 0, 0, previewCanvas.width, previewCanvas.height);
-          drawPreviewElements(ctx, previewScale, labelIndex);
-        };
-        bgImg.src = window.backgroundImgData;
-      } else {
-        ctx.fillStyle = "#fff";
+
+      if (showAll) {
+        previewCanvas.width = a4Width * previewScale;
+        previewCanvas.height = a4Height * previewScale;
+        previewCanvas.style.transform = '';
+
+        ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-        ctx.strokeStyle = "#000";
+        ctx.strokeStyle = '#000';
         ctx.strokeRect(0, 0, previewCanvas.width, previewCanvas.height);
-        drawPreviewElements(ctx, previewScale, labelIndex);
+
+        for (let idx = 1; idx <= 8; idx++) {
+          const col = (idx - 1) % 2;
+          const row = Math.floor((idx - 1) / 2);
+          const offsetX = col * labelWidth * previewScale;
+          const offsetY = row * labelHeight * previewScale;
+          await drawLabelAt(ctx, idx, offsetX, offsetY);
+        }
+      } else {
+        const labelIndex = parseInt(document.getElementById('previewLabel').value) || 1;
+        previewCanvas.width = labelWidth * previewScale;
+        previewCanvas.height = labelHeight * previewScale;
+        const rotation = labelIndex <= 4 ? -90 : 90;
+        previewCanvas.style.transform = `rotate(${rotation}deg)`;
+
+        if (window.backgroundImgData) {
+          const bgImg = new Image();
+          bgImg.onload = function() {
+            ctx.drawImage(bgImg, 0, 0, previewCanvas.width, previewCanvas.height);
+            drawPreviewElements(ctx, previewScale, labelIndex);
+          };
+          bgImg.src = window.backgroundImgData;
+        } else {
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+          ctx.strokeStyle = "#000";
+          ctx.strokeRect(0, 0, previewCanvas.width, previewCanvas.height);
+          drawPreviewElements(ctx, previewScale, labelIndex);
+        }
       }
     }
 
@@ -471,11 +497,43 @@
         ctx.fillRect(0, (labelHeight * currentScale) - margin, labelWidth * currentScale, margin);
       }
     }
+
+    async function drawLabelAt(ctx, labelIndex, offsetX, offsetY) {
+      const off = document.createElement('canvas');
+      off.width = labelWidth * previewScale;
+      off.height = labelHeight * previewScale;
+      const octx = off.getContext('2d');
+
+      if (window.backgroundImgData) {
+        const bgImg = new Image();
+        await new Promise(res => {
+          bgImg.onload = function() {
+            octx.drawImage(bgImg, 0, 0, off.width, off.height);
+            drawPreviewElements(octx, previewScale, labelIndex);
+            res();
+          };
+          bgImg.src = window.backgroundImgData;
+        });
+      } else {
+        octx.fillStyle = '#fff';
+        octx.fillRect(0, 0, off.width, off.height);
+        octx.strokeStyle = '#000';
+        octx.strokeRect(0, 0, off.width, off.height);
+        await drawPreviewElements(octx, previewScale, labelIndex);
+      }
+
+      const rotation = labelIndex <= 4 ? -90 : 90;
+      ctx.save();
+      ctx.translate(offsetX + off.width / 2, offsetY + off.height / 2);
+      ctx.rotate(rotation * Math.PI / 180);
+      ctx.drawImage(off, -off.width / 2, -off.height / 2);
+      ctx.restore();
+    }
     
     // ------------------ Dynamic Preview Update ------------------
-      const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize', 'previewLabel', 'showMargin'];
+      const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize', 'previewLabel', 'showMargin', 'previewAll'];
       previewInputs.forEach(id => {
-        const eventType = (id === 'previewLabel' || id === 'showMargin') ? 'change' : 'input';
+        const eventType = (id === 'previewLabel' || id === 'showMargin' || id === 'previewAll') ? 'change' : 'input';
         document.getElementById(id).addEventListener(eventType, updatePreview);
       });
     document.getElementById('generate-form').addEventListener('input', updatePreview);
