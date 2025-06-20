@@ -408,18 +408,66 @@
     function drawMarginOverlay(ctx, currentScale, labelIndex) {
       if (!document.getElementById('showMargin').checked) return;
       const margin = 5 * currentScale; // 5mm margin
-      const index = labelIndex - 1;
-      const col = index % 2;
-      const row = Math.floor(index / 2);
+
+      // Determine which sides should have a margin in the final orientation
+      const finalEdges = { top: false, bottom: false, left: false, right: false };
+      switch (labelIndex) {
+        case 1:
+          finalEdges.left = true;
+          finalEdges.top = true;
+          break;
+        case 2:
+        case 3:
+          finalEdges.top = true;
+          break;
+        case 4:
+          finalEdges.top = true;
+          finalEdges.right = true;
+          break;
+        case 5:
+          finalEdges.left = true;
+          finalEdges.bottom = true;
+          break;
+        case 6:
+        case 7:
+          finalEdges.bottom = true;
+          break;
+        case 8:
+          finalEdges.bottom = true;
+          finalEdges.right = true;
+          break;
+      }
+
+      // Map those edges to the canvas orientation before rotation
+      const rotation = labelIndex <= 4 ? -90 : 90;
+      let edges;
+      if (rotation === -90) {
+        edges = {
+          top: finalEdges.right,
+          right: finalEdges.bottom,
+          bottom: finalEdges.left,
+          left: finalEdges.top
+        };
+      } else {
+        edges = {
+          top: finalEdges.left,
+          right: finalEdges.top,
+          bottom: finalEdges.right,
+          left: finalEdges.bottom
+        };
+      }
+
       ctx.fillStyle = 'rgba(255,0,0,0.5)';
-      if (col === 0) {
+      if (edges.left) {
         ctx.fillRect(0, 0, margin, labelHeight * currentScale);
-      } else if (col === 1) {
+      }
+      if (edges.right) {
         ctx.fillRect((labelWidth * currentScale) - margin, 0, margin, labelHeight * currentScale);
       }
-      if (row === 0) {
+      if (edges.top) {
         ctx.fillRect(0, 0, labelWidth * currentScale, margin);
-      } else if (row === 3) {
+      }
+      if (edges.bottom) {
         ctx.fillRect(0, (labelHeight * currentScale) - margin, labelWidth * currentScale, margin);
       }
     }
