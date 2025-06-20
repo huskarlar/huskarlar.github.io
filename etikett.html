@@ -15,12 +15,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
-    /* The preview canvas is rotated 90° and given a margin so it doesn’t overlap other UI elements */
+    /* The preview canvas shows a single label using the same orientation
+       and aspect ratio as on the final A4 page */
     #preview-canvas {
       border: 1px solid #ccc;
       display: block;
-      margin: calc(297px / 4) auto;
-      transform: rotate(90deg);
+      margin: auto;
+      transform: none;
     }
     /* Loading overlay styles */
     #loadingOverlay {
@@ -145,7 +146,7 @@
       <option value="8">8</option>
     </select>
     <label class="block mb-2"><input type="checkbox" id="showMargin"> Show Margin Overlay</label>
-    <h3 class="text-lg font-bold">Label Preview (rotated 90°)</h3>
+    <h3 class="text-lg font-bold">Label Preview</h3>
     <!-- The label is 105 x 74.25 mm; preview uses a scale of 4 (1 mm = 4 px) -->
     <canvas id="preview-canvas" width="420" height="297"></canvas>
   </div>
