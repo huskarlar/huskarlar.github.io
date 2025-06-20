@@ -114,17 +114,6 @@
   <!-- Preview Controls -->
   <div id="preview-controls" class="max-w-lg mx-auto mt-6">
     <h3 class="text-lg font-bold">QR Code Settings</h3>
-    <label for="previewLabel">Preview Label:</label>
-    <select id="previewLabel" class="w-full p-2 border">
-      <option value="1">1</option>
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
-      <option value="6">6</option>
-      <option value="7">7</option>
-      <option value="8">8</option>
-    </select><br><br>
     <label for="qrOffsetX">QR Code X Offset (mm):</label>
     <input type="number" id="qrOffsetX" value="32.5" min="0" max="105" class="w-full p-2 border"><br><br>
     <label for="qrOffsetY">QR Code Y Offset (mm):</label>
@@ -142,8 +131,20 @@
     <button id="add-text-overlay" class="bg-purple-500 text-white p-2 w-full mt-2 cursor-pointer">Add Text Overlay</button>
   </div>
   
-  <!-- Preview Canvas -->
+  <!-- Preview Options and Canvas -->
   <div class="max-w-lg mx-auto mt-6">
+    <label for="previewLabel" class="block">Preview Label:</label>
+    <select id="previewLabel" class="w-full p-2 border mb-2">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+    </select>
+    <label class="block mb-2"><input type="checkbox" id="showMargin"> Show Margin Overlay</label>
     <h3 class="text-lg font-bold">Label Preview (rotated 90°)</h3>
     <!-- The label is 105 x 74.25 mm; preview uses a scale of 4 (1 mm = 4 px) -->
     <canvas id="preview-canvas" width="420" height="297"></canvas>
@@ -340,7 +341,7 @@
       }
     }
 
-    async function drawPreviewElements(ctx, currentScale, labelIndex) {
+      async function drawPreviewElements(ctx, currentScale, labelIndex) {
       const dummyURL = "DUMMY";
       const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
       const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
@@ -354,15 +355,16 @@
         return;
       }
       const qrImg = new Image();
-      qrImg.onload = function() {
-        ctx.drawImage(qrImg, qrOffsetX * currentScale, qrOffsetY * currentScale, qrSize * currentScale, qrSize * currentScale);
-        const flipText = (labelIndex === 1 || labelIndex === 8);
-        drawTextOverlays(ctx, currentScale, flipText);
-      };
-      qrImg.src = qrDataUrl;
-    }
+        qrImg.onload = function() {
+          ctx.drawImage(qrImg, qrOffsetX * currentScale, qrOffsetY * currentScale, qrSize * currentScale, qrSize * currentScale);
+          const flipText = (labelIndex === 1 || labelIndex === 8);
+          drawTextOverlays(ctx, currentScale, flipText);
+          drawMarginOverlay(ctx, currentScale, labelIndex);
+        };
+        qrImg.src = qrDataUrl;
+      }
 
-    function drawTextOverlays(ctx, currentScale, flipText) {
+      function drawTextOverlays(ctx, currentScale, flipText) {
       const container = document.getElementById('text-overlays-container');
       const overlays = container.querySelectorAll('.text-overlay');
       overlays.forEach(overlay => {
@@ -378,14 +380,12 @@
         const centered = overlay.querySelector('.overlay-centered').checked;
         
         ctx.save();
-        const posX = x * currentScale;
         const posY = y * currentScale;
+        let posX = x * currentScale;
         if (flipText) {
-          ctx.translate(labelWidth * currentScale - posX, posY);
-          ctx.scale(-1, 1);
-        } else {
-          ctx.translate(posX, posY);
+          posX = (labelWidth - x) * currentScale;
         }
+        ctx.translate(posX, posY);
         ctx.rotate(rotate * Math.PI / 180);
         ctx.fillStyle = color;
         if (centered) {
@@ -400,13 +400,32 @@
         ctx.restore();
       });
     }
+
+    function drawMarginOverlay(ctx, currentScale, labelIndex) {
+      if (!document.getElementById('showMargin').checked) return;
+      const margin = 5 * currentScale; // 5mm margin
+      const index = labelIndex - 1;
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      ctx.fillStyle = 'rgba(255,0,0,0.5)';
+      if (col === 0) {
+        ctx.fillRect(0, 0, margin, labelHeight * currentScale);
+      } else if (col === 1) {
+        ctx.fillRect((labelWidth * currentScale) - margin, 0, margin, labelHeight * currentScale);
+      }
+      if (row === 0) {
+        ctx.fillRect(0, 0, labelWidth * currentScale, margin);
+      } else if (row === 3) {
+        ctx.fillRect(0, (labelHeight * currentScale) - margin, labelWidth * currentScale, margin);
+      }
+    }
     
     // ------------------ Dynamic Preview Update ------------------
-    const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize', 'previewLabel'];
-    previewInputs.forEach(id => {
-      const eventType = id === 'previewLabel' ? 'change' : 'input';
-      document.getElementById(id).addEventListener(eventType, updatePreview);
-    });
+      const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize', 'previewLabel', 'showMargin'];
+      previewInputs.forEach(id => {
+        const eventType = (id === 'previewLabel' || id === 'showMargin') ? 'change' : 'input';
+        document.getElementById(id).addEventListener(eventType, updatePreview);
+      });
     document.getElementById('generate-form').addEventListener('input', updatePreview);
     document.getElementById('text-overlays-container').addEventListener('input', updatePreview);
     updatePreview();
@@ -572,14 +591,12 @@
         const centered = overlay.querySelector('.overlay-centered').checked;
         
         ctx.save();
-        const posX = x * pdfScale;
+        let posX = x * pdfScale;
         const posY = y * pdfScale;
         if (flipText) {
-          ctx.translate(labelWidth * pdfScale - posX, posY);
-          ctx.scale(-1, 1);
-        } else {
-          ctx.translate(posX, posY);
+          posX = (labelWidth - x) * pdfScale;
         }
+        ctx.translate(posX, posY);
         ctx.rotate(rotate * Math.PI / 180);
         ctx.fillStyle = color;
         if (centered) {
