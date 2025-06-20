@@ -15,13 +15,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
-    /* The preview canvas shows a single label using the same orientation
-       and aspect ratio as on the final A4 page */
+    /* The preview canvas rotates to match how each label will print when the
+       A4 sheet is fed in landscape orientation. Labels 1–4 show −90°
+       rotation and labels 5–8 show 90° rotation. */
     #preview-canvas {
       border: 1px solid #ccc;
       display: block;
       margin: auto;
-      transform: none;
+      transform-origin: center center;
     }
     /* Loading overlay styles */
     #loadingOverlay {
@@ -325,6 +326,8 @@
       const ctx = previewCanvas.getContext('2d');
       ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
       const labelIndex = parseInt(document.getElementById('previewLabel').value) || 1;
+      const rotation = labelIndex <= 4 ? -90 : 90;
+      previewCanvas.style.transform = `rotate(${rotation}deg)`;
       
       if (window.backgroundImgData) {
         const bgImg = new Image();
