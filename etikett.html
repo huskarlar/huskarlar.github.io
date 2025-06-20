@@ -333,7 +333,7 @@
       if (showAll) {
         previewCanvas.width = a4Width * previewScale;
         previewCanvas.height = a4Height * previewScale;
-        previewCanvas.style.transform = '';
+        previewCanvas.style.transform = 'rotate(90deg)';
 
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
@@ -345,7 +345,7 @@
           const row = Math.floor((idx - 1) / 2);
           const offsetX = col * labelWidth * previewScale;
           const offsetY = row * labelHeight * previewScale;
-          await drawLabelAt(ctx, idx, offsetX, offsetY);
+          await drawLabelAt(ctx, idx, offsetX, offsetY, false);
         }
       } else {
         const labelIndex = parseInt(document.getElementById('previewLabel').value) || 1;
@@ -358,7 +358,7 @@
           const bgImg = new Image();
           bgImg.onload = function() {
             ctx.drawImage(bgImg, 0, 0, previewCanvas.width, previewCanvas.height);
-            drawPreviewElements(ctx, previewScale, labelIndex);
+            drawPreviewElements(ctx, previewScale, labelIndex, rotation);
           };
           bgImg.src = window.backgroundImgData;
         } else {
@@ -366,12 +366,12 @@
           ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
           ctx.strokeStyle = "#000";
           ctx.strokeRect(0, 0, previewCanvas.width, previewCanvas.height);
-          drawPreviewElements(ctx, previewScale, labelIndex);
+          drawPreviewElements(ctx, previewScale, labelIndex, rotation);
         }
       }
     }
 
-      async function drawPreviewElements(ctx, currentScale, labelIndex) {
+      async function drawPreviewElements(ctx, currentScale, labelIndex, rotation) {
       const dummyURL = "DUMMY";
       const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
       const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
@@ -385,13 +385,16 @@
         return;
       }
       const qrImg = new Image();
+      await new Promise(resolve => {
         qrImg.onload = function() {
           ctx.drawImage(qrImg, qrOffsetX * currentScale, qrOffsetY * currentScale, qrSize * currentScale, qrSize * currentScale);
           const flipText = (labelIndex === 1 || labelIndex === 8);
           drawTextOverlays(ctx, currentScale, flipText);
-          drawMarginOverlay(ctx, currentScale, labelIndex);
+          drawMarginOverlay(ctx, currentScale, labelIndex, rotation);
+          resolve();
         };
         qrImg.src = qrDataUrl;
+      });
       }
 
       function drawTextOverlays(ctx, currentScale, flipText) {
@@ -431,7 +434,7 @@
       });
     }
 
-    function drawMarginOverlay(ctx, currentScale, labelIndex) {
+    function drawMarginOverlay(ctx, currentScale, labelIndex, rotation) {
       if (!document.getElementById('showMargin').checked) return;
       const margin = 5 * currentScale; // 5mm margin
 
@@ -465,7 +468,6 @@
       }
 
       // Map those edges to the canvas orientation before rotation
-      const rotation = labelIndex <= 4 ? -90 : 90;
       let edges;
       if (rotation === -90) {
         edges = {
@@ -474,13 +476,15 @@
           bottom: finalEdges.left,
           left: finalEdges.top
         };
-      } else {
+      } else if (rotation === 90) {
         edges = {
           top: finalEdges.left,
           right: finalEdges.top,
           bottom: finalEdges.right,
           left: finalEdges.bottom
         };
+      } else {
+        edges = finalEdges;
       }
 
       ctx.fillStyle = 'rgba(255,0,0,0.5)';
@@ -498,7 +502,7 @@
       }
     }
 
-    async function drawLabelAt(ctx, labelIndex, offsetX, offsetY) {
+    async function drawLabelAt(ctx, labelIndex, offsetX, offsetY, rotateLabel = true) {
       const off = document.createElement('canvas');
       off.width = labelWidth * previewScale;
       off.height = labelHeight * previewScale;
@@ -509,8 +513,7 @@
         await new Promise(res => {
           bgImg.onload = function() {
             octx.drawImage(bgImg, 0, 0, off.width, off.height);
-            drawPreviewElements(octx, previewScale, labelIndex);
-            res();
+            drawPreviewElements(octx, previewScale, labelIndex, rotateLabel ? (labelIndex <= 4 ? -90 : 90) : 0).then(res);
           };
           bgImg.src = window.backgroundImgData;
         });
@@ -519,15 +522,18 @@
         octx.fillRect(0, 0, off.width, off.height);
         octx.strokeStyle = '#000';
         octx.strokeRect(0, 0, off.width, off.height);
-        await drawPreviewElements(octx, previewScale, labelIndex);
+        await drawPreviewElements(octx, previewScale, labelIndex, rotateLabel ? (labelIndex <= 4 ? -90 : 90) : 0);
       }
-
-      const rotation = labelIndex <= 4 ? -90 : 90;
-      ctx.save();
-      ctx.translate(offsetX + off.width / 2, offsetY + off.height / 2);
-      ctx.rotate(rotation * Math.PI / 180);
-      ctx.drawImage(off, -off.width / 2, -off.height / 2);
-      ctx.restore();
+      if (rotateLabel) {
+        const rotation = labelIndex <= 4 ? -90 : 90;
+        ctx.save();
+        ctx.translate(offsetX + off.width / 2, offsetY + off.height / 2);
+        ctx.rotate(rotation * Math.PI / 180);
+        ctx.drawImage(off, -off.width / 2, -off.height / 2);
+        ctx.restore();
+      } else {
+        ctx.drawImage(off, offsetX, offsetY);
+      }
     }
     
     // ------------------ Dynamic Preview Update ------------------
