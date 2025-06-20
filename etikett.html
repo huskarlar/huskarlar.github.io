@@ -114,6 +114,17 @@
   <!-- Preview Controls -->
   <div id="preview-controls" class="max-w-lg mx-auto mt-6">
     <h3 class="text-lg font-bold">QR Code Settings</h3>
+    <label for="previewLabel">Preview Label:</label>
+    <select id="previewLabel" class="w-full p-2 border">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+    </select><br><br>
     <label for="qrOffsetX">QR Code X Offset (mm):</label>
     <input type="number" id="qrOffsetX" value="32.5" min="0" max="105" class="w-full p-2 border"><br><br>
     <label for="qrOffsetY">QR Code Y Offset (mm):</label>
@@ -311,12 +322,13 @@
       const previewCanvas = document.getElementById('preview-canvas');
       const ctx = previewCanvas.getContext('2d');
       ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      const labelIndex = parseInt(document.getElementById('previewLabel').value) || 1;
       
       if (window.backgroundImgData) {
         const bgImg = new Image();
         bgImg.onload = function() {
           ctx.drawImage(bgImg, 0, 0, previewCanvas.width, previewCanvas.height);
-          drawPreviewElements(ctx, previewScale);
+          drawPreviewElements(ctx, previewScale, labelIndex);
         };
         bgImg.src = window.backgroundImgData;
       } else {
@@ -324,11 +336,11 @@
         ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
         ctx.strokeStyle = "#000";
         ctx.strokeRect(0, 0, previewCanvas.width, previewCanvas.height);
-        drawPreviewElements(ctx, previewScale);
+        drawPreviewElements(ctx, previewScale, labelIndex);
       }
     }
-    
-    async function drawPreviewElements(ctx, currentScale) {
+
+    async function drawPreviewElements(ctx, currentScale, labelIndex) {
       const dummyURL = "DUMMY";
       const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
       const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
@@ -344,12 +356,13 @@
       const qrImg = new Image();
       qrImg.onload = function() {
         ctx.drawImage(qrImg, qrOffsetX * currentScale, qrOffsetY * currentScale, qrSize * currentScale, qrSize * currentScale);
-        drawTextOverlays(ctx, currentScale);
+        const flipText = (labelIndex === 1 || labelIndex === 8);
+        drawTextOverlays(ctx, currentScale, flipText);
       };
       qrImg.src = qrDataUrl;
     }
-    
-    function drawTextOverlays(ctx, currentScale) {
+
+    function drawTextOverlays(ctx, currentScale, flipText) {
       const container = document.getElementById('text-overlays-container');
       const overlays = container.querySelectorAll('.text-overlay');
       overlays.forEach(overlay => {
@@ -365,7 +378,14 @@
         const centered = overlay.querySelector('.overlay-centered').checked;
         
         ctx.save();
-        ctx.translate(x * currentScale, y * currentScale);
+        const posX = x * currentScale;
+        const posY = y * currentScale;
+        if (flipText) {
+          ctx.translate(labelWidth * currentScale - posX, posY);
+          ctx.scale(-1, 1);
+        } else {
+          ctx.translate(posX, posY);
+        }
         ctx.rotate(rotate * Math.PI / 180);
         ctx.fillStyle = color;
         if (centered) {
@@ -382,9 +402,10 @@
     }
     
     // ------------------ Dynamic Preview Update ------------------
-    const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize'];
+    const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize', 'previewLabel'];
     previewInputs.forEach(id => {
-      document.getElementById(id).addEventListener('input', updatePreview);
+      const eventType = id === 'previewLabel' ? 'change' : 'input';
+      document.getElementById(id).addEventListener(eventType, updatePreview);
     });
     document.getElementById('generate-form').addEventListener('input', updatePreview);
     document.getElementById('text-overlays-container').addEventListener('input', updatePreview);
@@ -491,7 +512,7 @@
     }
     
     // ------------------ Generate Label Image for PDF (High Resolution) ------------------
-    async function generateLabelImage(url) {
+    async function generateLabelImage(url, flipText) {
       const canvas = document.createElement('canvas');
       canvas.width = labelWidth * pdfScale;
       canvas.height = labelHeight * pdfScale;
@@ -551,7 +572,14 @@
         const centered = overlay.querySelector('.overlay-centered').checked;
         
         ctx.save();
-        ctx.translate(x * pdfScale, y * pdfScale);
+        const posX = x * pdfScale;
+        const posY = y * pdfScale;
+        if (flipText) {
+          ctx.translate(labelWidth * pdfScale - posX, posY);
+          ctx.scale(-1, 1);
+        } else {
+          ctx.translate(posX, posY);
+        }
         ctx.rotate(rotate * Math.PI / 180);
         ctx.fillStyle = color;
         if (centered) {
@@ -611,11 +639,8 @@
           const labelX = col * labelWidth;
           const labelY = row * labelHeight;
           
-          let labelDataUrl = await generateLabelImage(group[i]);
-          // For labels in the first column, flip both horizontally and vertically.
-          if (col === 0) {
-            labelDataUrl = await flipImageBoth(labelDataUrl, labelWidth * pdfScale, labelHeight * pdfScale);
-          }
+          const flipText = (labelIndexOnPage === 0 || labelIndexOnPage === 7);
+          let labelDataUrl = await generateLabelImage(group[i], flipText);
           doc.addImage(labelDataUrl, "PNG", labelX, labelY, labelWidth, labelHeight);
         }
         const pdfData = doc.output("arraybuffer");
