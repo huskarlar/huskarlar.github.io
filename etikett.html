@@ -17,7 +17,8 @@
   <style>
     /* The preview canvas rotates to match how each label will print when the
        A4 sheet is fed in landscape orientation. Labels 1–4 show −90°
-       rotation and labels 5–8 show 90° rotation. */
+       rotation and labels 5–8 show 90° rotation. The full-sheet preview is
+       rotated 90° so the A4 page appears in landscape. */
     #preview-canvas {
       border: 1px solid #ccc;
       display: block;
@@ -335,9 +336,10 @@
       ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
       if (showAll) {
-        previewCanvas.width = a4Width * previewScale;
-        previewCanvas.height = a4Height * previewScale;
-        previewCanvas.style.transform = '';
+        // Show the entire A4 sheet in landscape orientation
+        previewCanvas.width = a4Height * previewScale;
+        previewCanvas.height = a4Width * previewScale;
+        previewCanvas.style.transform = 'rotate(90deg)';
 
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
@@ -355,9 +357,11 @@
           drawSheetMargins(ctx);
         }
       } else {
+        // Single label preview – rotate depending on row
+        const rotate = labelIndex <= 4 ? '-90deg' : '90deg';
         previewCanvas.width = labelWidth * previewScale;
         previewCanvas.height = labelHeight * previewScale;
-        previewCanvas.style.transform = '';
+        previewCanvas.style.transform = `rotate(${rotate})`;
 
         await drawLabelAt(ctx, labelIndex, 0, 0);
         if (showMargin) {
