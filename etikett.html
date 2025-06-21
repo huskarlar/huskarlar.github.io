@@ -471,17 +471,17 @@
       let edges;
       if (rotation === -90) {
         edges = {
-          top: finalEdges.right,
-          right: finalEdges.bottom,
-          bottom: finalEdges.left,
-          left: finalEdges.top
-        };
-      } else if (rotation === 90) {
-        edges = {
           top: finalEdges.left,
           right: finalEdges.top,
           bottom: finalEdges.right,
           left: finalEdges.bottom
+        };
+      } else if (rotation === 90) {
+        edges = {
+          top: finalEdges.right,
+          right: finalEdges.bottom,
+          bottom: finalEdges.left,
+          left: finalEdges.top
         };
       } else {
         edges = finalEdges;
