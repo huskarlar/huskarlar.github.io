@@ -135,6 +135,20 @@
   
   <!-- Preview Options and Canvas -->
   <div class="max-w-lg mx-auto mt-6">
+    <div class="mb-2 flex items-center">
+      <label for="previewLabel" class="mr-2">Preview Label:</label>
+      <select id="previewLabel" class="border p-1 mr-4">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+      </select>
+      <label class="ml-2"><input type="checkbox" id="showMargin"> Show Margin</label>
+    </div>
     <label class="block mb-2"><input type="checkbox" id="previewAll"> Preview Entire Sheet</label>
     <h3 class="text-lg font-bold">Label Preview</h3>
     <!-- The label is 105 x 74.25 mm; preview uses a scale of 4 (1 mm = 4 px) -->
@@ -316,12 +330,14 @@
       const previewCanvas = document.getElementById('preview-canvas');
       const ctx = previewCanvas.getContext('2d');
       const showAll = document.getElementById('previewAll').checked;
+      const showMargin = document.getElementById('showMargin').checked;
+      const labelIndex = parseInt(document.getElementById('previewLabel').value);
       ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
       if (showAll) {
         previewCanvas.width = a4Width * previewScale;
         previewCanvas.height = a4Height * previewScale;
-        previewCanvas.style.transform = 'rotate(90deg)';
+        previewCanvas.style.transform = '';
 
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
@@ -333,29 +349,19 @@
           const row = Math.floor((idx - 1) / 2);
           const offsetX = col * labelWidth * previewScale;
           const offsetY = row * labelHeight * previewScale;
-          await drawLabelAt(ctx, idx, offsetX, offsetY, false, 90);
+          await drawLabelAt(ctx, idx, offsetX, offsetY);
         }
-        drawSheetMargins(ctx);
+        if (showMargin) {
+          drawSheetMargins(ctx);
+        }
       } else {
-        const labelIndex = 1;
         previewCanvas.width = labelWidth * previewScale;
         previewCanvas.height = labelHeight * previewScale;
-        const rotation = -90;
-        previewCanvas.style.transform = `rotate(${rotation}deg)`;
+        previewCanvas.style.transform = '';
 
-        if (window.backgroundImgData) {
-          const bgImg = new Image();
-          bgImg.onload = function() {
-            ctx.drawImage(bgImg, 0, 0, previewCanvas.width, previewCanvas.height);
-            drawPreviewElements(ctx, previewScale, true);
-          };
-          bgImg.src = window.backgroundImgData;
-        } else {
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-          ctx.strokeStyle = "#000";
-          ctx.strokeRect(0, 0, previewCanvas.width, previewCanvas.height);
-          drawPreviewElements(ctx, previewScale, true);
+        await drawLabelAt(ctx, labelIndex, 0, 0);
+        if (showMargin) {
+          drawMarginOverlay(ctx, previewScale, labelIndex);
         }
       }
     }
@@ -421,56 +427,34 @@
       });
     }
 
-    function drawMarginOverlay(ctx, currentScale, labelIndex, rotation) {
+    function drawMarginOverlay(ctx, currentScale, labelIndex) {
       const margin = 5 * currentScale; // 5mm margin
-
-      // Determine which sides should have a margin in the final orientation
-      const finalEdges = { top: false, bottom: false, left: false, right: false };
+      const edges = { top: false, bottom: false, left: false, right: false };
       switch (labelIndex) {
         case 1:
-          finalEdges.left = true;
-          finalEdges.top = true;
+          edges.left = true;
+          edges.top = true;
           break;
         case 2:
         case 3:
-          finalEdges.top = true;
+          edges.top = true;
           break;
         case 4:
-          finalEdges.top = true;
-          finalEdges.right = true;
+          edges.top = true;
+          edges.right = true;
           break;
         case 5:
-          finalEdges.left = true;
-          finalEdges.bottom = true;
+          edges.left = true;
+          edges.bottom = true;
           break;
         case 6:
         case 7:
-          finalEdges.bottom = true;
+          edges.bottom = true;
           break;
         case 8:
-          finalEdges.bottom = true;
-          finalEdges.right = true;
+          edges.bottom = true;
+          edges.right = true;
           break;
-      }
-
-      // Map those edges to the canvas orientation before rotation
-      let edges;
-      if (rotation === -90) {
-        edges = {
-          top: finalEdges.left,
-          right: finalEdges.top,
-          bottom: finalEdges.right,
-          left: finalEdges.bottom
-        };
-      } else if (rotation === 90) {
-        edges = {
-          top: finalEdges.right,
-          right: finalEdges.bottom,
-          bottom: finalEdges.left,
-          left: finalEdges.top
-        };
-      } else {
-        edges = finalEdges;
       }
 
       ctx.fillStyle = 'rgba(255,0,0,0.5)';
@@ -494,12 +478,12 @@
         const row = Math.floor((idx - 1) / 2);
         ctx.save();
         ctx.translate(col * labelWidth * previewScale, row * labelHeight * previewScale);
-        drawMarginOverlay(ctx, previewScale, idx, 90);
+        drawMarginOverlay(ctx, previewScale, idx);
         ctx.restore();
       }
     }
 
-    async function drawLabelAt(ctx, labelIndex, offsetX, offsetY, rotateLabel = true, sheetRotation = 0) {
+    async function drawLabelAt(ctx, labelIndex, offsetX, offsetY) {
       const off = document.createElement('canvas');
       off.width = labelWidth * previewScale;
       off.height = labelHeight * previewScale;
@@ -532,23 +516,16 @@
 
       await drawPreviewElements(octx, previewScale, flipTextPos);
       octx.restore();
-      if (rotateLabel) {
-        const rotation = labelIndex <= 4 ? -90 : 90;
-        ctx.save();
-        ctx.translate(offsetX + off.width / 2, offsetY + off.height / 2);
-        ctx.rotate(rotation * Math.PI / 180);
-        ctx.drawImage(off, -off.width / 2, -off.height / 2);
-        ctx.restore();
-      } else {
-        ctx.drawImage(off, offsetX, offsetY);
-      }
+      ctx.drawImage(off, offsetX, offsetY);
     }
     
     // ------------------ Dynamic Preview Update ------------------
-      const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize', 'previewAll'];
+      const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize'];
       previewInputs.forEach(id => {
-        const eventType = id === 'previewAll' ? 'change' : 'input';
-        document.getElementById(id).addEventListener(eventType, updatePreview);
+        document.getElementById(id).addEventListener('input', updatePreview);
+      });
+      ['previewAll', 'previewLabel', 'showMargin'].forEach(id => {
+        document.getElementById(id).addEventListener('change', updatePreview);
       });
     document.getElementById('generate-form').addEventListener('input', updatePreview);
     document.getElementById('text-overlays-container').addEventListener('input', updatePreview);
