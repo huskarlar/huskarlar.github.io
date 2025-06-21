@@ -333,13 +333,14 @@
       const showAll = document.getElementById('previewAll').checked;
       const showMargin = document.getElementById('showMargin').checked;
       const labelIndex = parseInt(document.getElementById('previewLabel').value);
-      ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
       if (showAll) {
         // Show the entire A4 sheet in landscape orientation
         previewCanvas.width = a4Height * previewScale;
         previewCanvas.height = a4Width * previewScale;
         previewCanvas.style.transform = 'rotate(90deg)';
+
+        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
@@ -362,6 +363,8 @@
         previewCanvas.width = labelWidth * previewScale;
         previewCanvas.height = labelHeight * previewScale;
         previewCanvas.style.transform = `rotate(${rotate})`;
+
+        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
         await drawLabelAt(ctx, labelIndex, 0, 0);
         if (showMargin) {
