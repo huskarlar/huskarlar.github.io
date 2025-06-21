@@ -345,7 +345,7 @@
           const row = Math.floor((idx - 1) / 2);
           const offsetX = col * labelWidth * previewScale;
           const offsetY = row * labelHeight * previewScale;
-          await drawLabelAt(ctx, idx, offsetX, offsetY, false);
+          await drawLabelAt(ctx, idx, offsetX, offsetY, false, 90);
         }
       } else {
         const labelIndex = parseInt(document.getElementById('previewLabel').value) || 1;
@@ -502,7 +502,7 @@
       }
     }
 
-    async function drawLabelAt(ctx, labelIndex, offsetX, offsetY, rotateLabel = true) {
+    async function drawLabelAt(ctx, labelIndex, offsetX, offsetY, rotateLabel = true, sheetRotation = 0) {
       const off = document.createElement('canvas');
       off.width = labelWidth * previewScale;
       off.height = labelHeight * previewScale;
@@ -513,7 +513,8 @@
         await new Promise(res => {
           bgImg.onload = function() {
             octx.drawImage(bgImg, 0, 0, off.width, off.height);
-            drawPreviewElements(octx, previewScale, labelIndex, rotateLabel ? (labelIndex <= 4 ? -90 : 90) : 0).then(res);
+            const rot = rotateLabel ? (labelIndex <= 4 ? -90 : 90) : sheetRotation;
+            drawPreviewElements(octx, previewScale, labelIndex, rot).then(res);
           };
           bgImg.src = window.backgroundImgData;
         });
@@ -522,7 +523,8 @@
         octx.fillRect(0, 0, off.width, off.height);
         octx.strokeStyle = '#000';
         octx.strokeRect(0, 0, off.width, off.height);
-        await drawPreviewElements(octx, previewScale, labelIndex, rotateLabel ? (labelIndex <= 4 ? -90 : 90) : 0);
+        const rot = rotateLabel ? (labelIndex <= 4 ? -90 : 90) : sheetRotation;
+        await drawPreviewElements(octx, previewScale, labelIndex, rot);
       }
       if (rotateLabel) {
         const rotation = labelIndex <= 4 ? -90 : 90;
