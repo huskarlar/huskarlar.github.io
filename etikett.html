@@ -22,9 +22,6 @@
       margin: calc(297px / 4) auto;
       transform: rotate(90deg);
     }
-    /* Loading overlay styles */
-    #loadingOverlay {
-      position: fixed;
       top: 0;
       left: 0;
       width: 100%;
@@ -140,24 +137,10 @@
     <!-- A4 preview: 210 x 297 mm; scale 2 (1 mm = 2 px) -->
     <canvas id="a4-preview-canvas" width="420" height="594" style="border: 1px solid #ccc; display: none; margin: 20px auto; transform: rotate(90deg);"></canvas>
   </div>
-  
-  <!-- Generate PDF Button -->
-  <button id="create-labels" class="bg-green-500 text-white p-2 mt-4 w-full cursor-pointer">
-    Create Labels (Generate ZIP)
-  </button>
-  
-  <script>
-  (function() {
-    const EC = window.elliptic.ec;
-    const ec = new EC('secp256k1');
-    // Global background image data (Data URL)
-    window.backgroundImgData = null;
     
     // Label dimensions in mm
     const labelWidth = 105;
     const labelHeight = 74.25;
-    // Scale factors:
-    // Preview uses 1 mm = 4 px.
     const previewScale = 4;
     // PDF generation uses a higher resolution (e.g. 1 mm = 8 px).
     const pdfScale = 8;
@@ -346,28 +329,26 @@ async function updatePreview() {
           const row = Math.floor(i / 2);
           const labelX = col * (labelWidth * a4Scale);
           const labelY = row * (labelHeight * a4Scale);
-          
           ctxA4.save();
           ctxA4.translate(labelX, labelY);
-          
           if (window.backgroundImgData) {
             const bgImg = new Image();
-            bgImg.onload = function() {
-              ctxA4.drawImage(bgImg, 0, 0, labelWidth * a4Scale, labelHeight * a4Scale);
-            };
-            bgImg.src = window.backgroundImgData;
+            await new Promise(res => {
+              bgImg.onload = function() {
+                ctxA4.drawImage(bgImg, 0, 0, labelWidth * a4Scale, labelHeight * a4Scale);
+                res();
+              };
+              bgImg.src = window.backgroundImgData;
+            });
           } else {
             ctxA4.fillStyle = "#fff";
             ctxA4.fillRect(0, 0, labelWidth * a4Scale, labelHeight * a4Scale);
             ctxA4.strokeStyle = "#000";
             ctxA4.strokeRect(0, 0, labelWidth * a4Scale, labelHeight * a4Scale);
           }
-          
-          // Call drawPreviewElements for each label
-          drawPreviewElements(ctxA4, a4Scale, 0.67, i, true);
-          
+          // Draw the QR code and text before restoring the context
+          await drawPreviewElements(ctxA4, a4Scale, 0.67, i, true);
           ctxA4.restore();
-        }
       } else {
         singleCanvas.style.display = 'block';
         a4Canvas.style.display = 'none';
@@ -376,27 +357,23 @@ async function updatePreview() {
         // Single label preview
         if (window.backgroundImgData) {
           const bgImg = new Image();
-          bgImg.onload = function() {
-            ctxSingle.drawImage(bgImg, 0, 0, singleCanvas.width, singleCanvas.height);
-            drawPreviewElements(ctxSingle, previewScale, 1.333, 0, false);
-          };
-          bgImg.src = window.backgroundImgData;
+          await new Promise(res => {
+            bgImg.onload = function() {
+              ctxSingle.drawImage(bgImg, 0, 0, singleCanvas.width, singleCanvas.height);
+              res();
+            };
+            bgImg.src = window.backgroundImgData;
+          });
         } else {
           ctxSingle.fillStyle = "#fff";
           ctxSingle.fillRect(0, 0, singleCanvas.width, singleCanvas.height);
           ctxSingle.strokeStyle = "#000";
           ctxSingle.strokeRect(0, 0, singleCanvas.width, singleCanvas.height);
-          drawPreviewElements(ctxSingle, previewScale, 1.333, 0, false);
-        }
-      }
+        await drawPreviewElements(ctxSingle, previewScale, 1.333, 0, false);
     }
     
     async function drawPreviewElements(ctx, currentScale, scaledFontSize, labelIndex = 0, applyMirroring = false) {
-      const dummyURL = "DUMMY";
-      const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
-      const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
-      const qrOffsetY = parseFloat(document.getElementById('qrOffsetY').value) || ((labelHeight - qrSize) / 2);
-      
+
       let qrDataUrl;
       try {
         qrDataUrl = await generateQRCodeDataURL(dummyURL, qrSize * currentScale);
@@ -404,30 +381,17 @@ async function updatePreview() {
         console.error(err);
         return;
       }
-      const qrImg = new Image();
-      qrImg.onload = function() {
-        ctx.drawImage(qrImg, qrOffsetX * currentScale, qrOffsetY * currentScale, qrSize * currentScale, qrSize * currentScale);
-        drawTextOverlays(ctx, currentScale, scaledFontSize, labelIndex, applyMirroring);
-      };
-      qrImg.src = qrDataUrl;
+
+      await new Promise(res => {
+        const qrImg = new Image();
+          drawTextOverlays(ctx, currentScale, scaledFontSize, labelIndex, applyMirroring);
+          res();
     }
     
     function drawTextOverlays(ctx, currentScale, scaledFontSize, labelIndex = 0, applyMirroring = false) {
-      const container = document.getElementById('text-overlays-container');
-      const overlays = container.querySelectorAll('.text-overlay');
-      overlays.forEach(overlay => {
-        const text = overlay.querySelector('.overlay-text').value;
         let x = parseFloat(overlay.querySelector('.overlay-x').value) || 0;
         let y = parseFloat(overlay.querySelector('.overlay-y').value) || 0;
-        const fontSize = parseFloat(overlay.querySelector('.overlay-font-size').value) || 12;
-        const fontFamily = overlay.querySelector('.overlay-font-family').value || "Arial";
-        const color = overlay.querySelector('.overlay-color').value || "#000000";
-        const rotate = parseFloat(overlay.querySelector('.overlay-rotate').value) || 0;
-        const italic = overlay.querySelector('.overlay-italic').checked;
-        const bold = overlay.querySelector('.overlay-bold').checked;
         const outline = overlay.querySelector('.overlay-outline').checked;
-        const centered = overlay.querySelector('.overlay-centered').checked;
-        
         // Use the passed scaledFontSize parameter
         const finalFontSize = fontSize * scaledFontSize;
         
@@ -458,16 +422,7 @@ async function updatePreview() {
         ctx.save();
         ctx.translate(x * currentScale, y * currentScale);
         ctx.rotate(rotate * Math.PI / 180);
-        ctx.fillStyle = color;
-        if (centered) {
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-        } else {
-          ctx.textAlign = "left";
-          ctx.textBaseline = "top";
-        }
         ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + finalFontSize + "px " + fontFamily;
-        ctx.fillText(text, 0, 0);
         if (outline) {
           ctx.strokeStyle = "#000000";
           ctx.lineWidth = 0.5 * (currentScale / previewScale); // Adjust line width based on scale
@@ -476,9 +431,12 @@ async function updatePreview() {
         ctx.restore();
       });
     }
-    
     // ------------------ Dynamic Preview Update ------------------
     const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize'];
+    previewInputs.forEach(id => {
+      document.getElementById(id).addEventListener('input', updatePreview);
+    });
+    document.getElementById('a4PreviewCheckbox').addEventListener('change', updatePreview);
     previewInputs.forEach(id => {
       document.getElementById(id).addEventListener('input', updatePreview);
     });
@@ -572,6 +530,7 @@ async function updatePreview() {
     // ------------------ Helper: Flip an Image Both Horizontally and Vertically ------------------
     function flipImageBoth(dataUrl, width, height) {
       return new Promise(resolve => {
+        <label><input type="checkbox" class="overlay-outline" ${config.outline ? "checked" : ""}> Outline</label>
         const img = new Image();
         img.onload = function() {
           const canvas = document.createElement('canvas');
@@ -594,12 +553,6 @@ async function updatePreview() {
       canvas.width = labelWidth * pdfScale;
       canvas.height = labelHeight * pdfScale;
       const ctx = canvas.getContext('2d');
-      
-      if (window.backgroundImgData) {
-        await new Promise(resolve => {
-          const bgImg = new Image();
-          bgImg.onload = function() {
-            ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
             resolve();
           };
           bgImg.src = window.backgroundImgData;
@@ -636,42 +589,8 @@ async function updatePreview() {
       // Draw text overlays using the same function as preview
       const labelIndex = row * 2 + col; // Calculate label index from row and col
       drawTextOverlays(ctx, pdfScale, 1.333 * (pdfScale / previewScale), labelIndex, true);
-      
       return canvas.toDataURL("image/png");
     }
-    
-    // ------------------ PDF Generation: Create PDFs and Zip Them ------------------
-    async function createLabelsPdfs() {
-      showLoading();
-      let urls = document.getElementById('output').value
-        .split('\n')
-        .map(u => u.trim())
-        .filter(u => u !== "");
-      if (urls.length === 0) {
-        alert("No URLs found. Please generate short URLs first.");
-        hideLoading();
-        return;
-      }
-      
-      if (document.getElementById('randomize').checked) {
-        for (let i = urls.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [urls[i], urls[j]] = [urls[j], urls[i]];
-        }
-      }
-      
-      const groups = [];
-      for (let i = 0; i < urls.length; i += 8) {
-        groups.push(urls.slice(i, i + 8));
-      }
-      
-      const { jsPDF } = window.jspdf;
-      const zip = new JSZip();
-      
-      for (let g = 0; g < groups.length; g++) {
-        const group = groups[g];
-        const doc = new jsPDF({ unit: "mm", format: "a4" });
-        for (let i = 0; i < group.length; i++) {
           if (i > 0 && i % 8 === 0) {
             doc.addPage();
           }
@@ -686,6 +605,8 @@ async function updatePreview() {
           if (col === 0) {
             labelDataUrl = await flipImageBoth(labelDataUrl, labelWidth * pdfScale, labelHeight * pdfScale);
           }
+          doc.addImage(labelDataUrl, "PNG", labelX, labelY, labelWidth, labelHeight);
+        }
           doc.addImage(labelDataUrl, "PNG", labelX, labelY, labelWidth, labelHeight);
         }
         const pdfData = doc.output("arraybuffer");
