@@ -15,15 +15,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
-    /* The preview canvas rotates to match how each label will print when the
-       A4 sheet is fed in landscape orientation. Labels 1–4 show −90°
-       rotation and labels 5–8 show 90° rotation. The full-sheet preview is
-       rotated 90° so the A4 page appears in landscape. */
+    /* The preview canvas is rotated 90° and given a margin so it doesn’t overlap other UI elements */
     #preview-canvas {
       border: 1px solid #ccc;
       display: block;
-      margin: auto;
-      transform-origin: center center;
+      margin: calc(297px / 4) auto;
+      transform: rotate(90deg);
     }
     /* Loading overlay styles */
     #loadingOverlay {
@@ -134,26 +131,14 @@
     <button id="add-text-overlay" class="bg-purple-500 text-white p-2 w-full mt-2 cursor-pointer">Add Text Overlay</button>
   </div>
   
-  <!-- Preview Options and Canvas -->
+  <!-- Preview Canvas -->
   <div class="max-w-lg mx-auto mt-6">
-    <div class="mb-2 flex items-center">
-      <label for="previewLabel" class="mr-2">Preview Label:</label>
-      <select id="previewLabel" class="border p-1 mr-4">
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-      </select>
-      <label class="ml-2"><input type="checkbox" id="showMargin"> Show Margin</label>
-    </div>
-    <label class="block mb-2"><input type="checkbox" id="previewAll"> Preview Entire Sheet</label>
-    <h3 class="text-lg font-bold">Label Preview</h3>
-    <!-- The label is 105 x 74.25 mm; preview uses a scale of 4 (1 mm = 4 px) -->
-    <canvas id="preview-canvas" width="420" height="297"></canvas>
+    <h3 class="text-lg font-bold">Label Preview (rotated 90°)</h3>
+    <label><input type="checkbox" id="a4PreviewCheckbox"> Show Full A4 Preview with Printer Margins</label><br><br>
+    <!-- Single label preview: 105 x 74.25 mm; scale 4 (1 mm = 4 px) -->
+    <canvas id="single-preview-canvas" width="420" height="297" style="border: 1px solid #ccc; display: block; margin: calc(297px / 4) auto; transform: rotate(90deg);"></canvas>
+    <!-- A4 preview: 210 x 297 mm; scale 2 (1 mm = 2 px) -->
+    <canvas id="a4-preview-canvas" width="420" height="594" style="border: 1px solid #ccc; display: none; margin: 20px auto; transform: rotate(90deg);"></canvas>
   </div>
   
   <!-- Generate PDF Button -->
@@ -171,8 +156,6 @@
     // Label dimensions in mm
     const labelWidth = 105;
     const labelHeight = 74.25;
-    const a4Width = 210;
-    const a4Height = 297;
     // Scale factors:
     // Preview uses 1 mm = 4 px.
     const previewScale = 4;
@@ -327,53 +310,88 @@
     }
     
     // ------------------ Preview: Update the Preview Canvas ------------------
-    async function updatePreview() {
-      const previewCanvas = document.getElementById('preview-canvas');
-      const ctx = previewCanvas.getContext('2d');
-      const showAll = document.getElementById('previewAll').checked;
-      const showMargin = document.getElementById('showMargin').checked;
-      const labelIndex = parseInt(document.getElementById('previewLabel').value);
+async function updatePreview() {
+      const singleCanvas = document.getElementById('single-preview-canvas');
+      const a4Canvas = document.getElementById('a4-preview-canvas');
+      const ctxSingle = singleCanvas.getContext('2d');
+      const ctxA4 = a4Canvas.getContext('2d');
+      const a4PreviewEnabled = document.getElementById('a4PreviewCheckbox').checked;
 
-      if (showAll) {
-        // Show the entire A4 sheet in landscape orientation
-        previewCanvas.width = a4Height * previewScale;
-        previewCanvas.height = a4Width * previewScale;
-        previewCanvas.style.transform = 'rotate(90deg)';
-
-        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-        ctx.strokeStyle = '#000';
-        ctx.strokeRect(0, 0, previewCanvas.width, previewCanvas.height);
-
-        for (let idx = 1; idx <= 8; idx++) {
-          const col = (idx - 1) % 2;
-          const row = Math.floor((idx - 1) / 2);
-          const offsetX = col * labelWidth * previewScale;
-          const offsetY = row * labelHeight * previewScale;
-          await drawLabelAt(ctx, idx, offsetX, offsetY);
-        }
-        if (showMargin) {
-          drawSheetMargins(ctx);
+      if (a4PreviewEnabled) {
+        singleCanvas.style.display = 'none';
+        a4Canvas.style.display = 'block';
+        
+        ctxA4.clearRect(0, 0, a4Canvas.width, a4Canvas.height);
+        // Draw A4 background (full sheet)
+        ctxA4.fillStyle = "#fff";
+        ctxA4.fillRect(0, 0, a4Canvas.width, a4Canvas.height);
+        
+        // Draw printer margins with 50% red transparency
+        const marginSize = 10; // Approximate margin in pixels for preview
+        ctxA4.fillStyle = "rgba(255, 0, 0, 0.5)";
+        // Left margin
+        ctxA4.fillRect(0, 0, marginSize, a4Canvas.height);
+        // Right margin
+        ctxA4.fillRect(a4Canvas.width - marginSize, 0, marginSize, a4Canvas.height);
+        // Top margin
+        ctxA4.fillRect(0, 0, a4Canvas.width, marginSize);
+        // Bottom margin
+        ctxA4.fillRect(0, a4Canvas.height - marginSize, a4Canvas.width, marginSize);
+        
+        // Draw 8 labels in 2x4 grid
+        const a4Scale = previewScale / 2;
+        
+        for (let i = 0; i < 8; i++) {
+          const col = i % 2;
+          const row = Math.floor(i / 2);
+          const labelX = col * (labelWidth * a4Scale);
+          const labelY = row * (labelHeight * a4Scale);
+          
+          ctxA4.save();
+          ctxA4.translate(labelX, labelY);
+          
+          if (window.backgroundImgData) {
+            const bgImg = new Image();
+            bgImg.onload = function() {
+              ctxA4.drawImage(bgImg, 0, 0, labelWidth * a4Scale, labelHeight * a4Scale);
+            };
+            bgImg.src = window.backgroundImgData;
+          } else {
+            ctxA4.fillStyle = "#fff";
+            ctxA4.fillRect(0, 0, labelWidth * a4Scale, labelHeight * a4Scale);
+            ctxA4.strokeStyle = "#000";
+            ctxA4.strokeRect(0, 0, labelWidth * a4Scale, labelHeight * a4Scale);
+          }
+          
+          // Call drawPreviewElements for each label
+          drawPreviewElements(ctxA4, a4Scale, 0.67, i, true);
+          
+          ctxA4.restore();
         }
       } else {
-        // Single label preview – rotate depending on row
-        const rotate = labelIndex <= 4 ? '-90deg' : '90deg';
-        previewCanvas.width = labelWidth * previewScale;
-        previewCanvas.height = labelHeight * previewScale;
-        previewCanvas.style.transform = `rotate(${rotate})`;
+        singleCanvas.style.display = 'block';
+        a4Canvas.style.display = 'none';
 
-        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-
-        await drawLabelAt(ctx, labelIndex, 0, 0);
-        if (showMargin) {
-          drawMarginOverlay(ctx, previewScale, labelIndex);
+        ctxSingle.clearRect(0, 0, singleCanvas.width, singleCanvas.height);
+        // Single label preview
+        if (window.backgroundImgData) {
+          const bgImg = new Image();
+          bgImg.onload = function() {
+            ctxSingle.drawImage(bgImg, 0, 0, singleCanvas.width, singleCanvas.height);
+            drawPreviewElements(ctxSingle, previewScale, 1.333, 0, false);
+          };
+          bgImg.src = window.backgroundImgData;
+        } else {
+          ctxSingle.fillStyle = "#fff";
+          ctxSingle.fillRect(0, 0, singleCanvas.width, singleCanvas.height);
+          ctxSingle.strokeStyle = "#000";
+          ctxSingle.strokeRect(0, 0, singleCanvas.width, singleCanvas.height);
+          drawPreviewElements(ctxSingle, previewScale, 1.333, 0, false);
         }
       }
     }
-
-    async function drawPreviewElements(ctx, currentScale, flipTextPos) {
+    
+    async function drawPreviewElements(ctx, currentScale, scaledFontSize, labelIndex = 0, applyMirroring = false) {
       const dummyURL = "DUMMY";
       const qrSize = parseFloat(document.getElementById('qrSize').value) || 40;
       const qrOffsetX = parseFloat(document.getElementById('qrOffsetX').value) || ((labelWidth - qrSize) / 2);
@@ -387,38 +405,58 @@
         return;
       }
       const qrImg = new Image();
-      await new Promise(resolve => {
-        qrImg.onload = function() {
-          ctx.drawImage(qrImg, qrOffsetX * currentScale, qrOffsetY * currentScale, qrSize * currentScale, qrSize * currentScale);
-          drawTextOverlays(ctx, currentScale, flipTextPos);
-          resolve();
-        };
-        qrImg.src = qrDataUrl;
-      });
-      }
-
-      function drawTextOverlays(ctx, currentScale, flipTextPos) {
+      qrImg.onload = function() {
+        ctx.drawImage(qrImg, qrOffsetX * currentScale, qrOffsetY * currentScale, qrSize * currentScale, qrSize * currentScale);
+        drawTextOverlays(ctx, currentScale, scaledFontSize, labelIndex, applyMirroring);
+      };
+      qrImg.src = qrDataUrl;
+    }
+    
+    function drawTextOverlays(ctx, currentScale, scaledFontSize, labelIndex = 0, applyMirroring = false) {
       const container = document.getElementById('text-overlays-container');
       const overlays = container.querySelectorAll('.text-overlay');
       overlays.forEach(overlay => {
         const text = overlay.querySelector('.overlay-text').value;
-        const x = parseFloat(overlay.querySelector('.overlay-x').value) || 0;
-        const y = parseFloat(overlay.querySelector('.overlay-y').value) || 0;
+        let x = parseFloat(overlay.querySelector('.overlay-x').value) || 0;
+        let y = parseFloat(overlay.querySelector('.overlay-y').value) || 0;
         const fontSize = parseFloat(overlay.querySelector('.overlay-font-size').value) || 12;
         const fontFamily = overlay.querySelector('.overlay-font-family').value || "Arial";
         const color = overlay.querySelector('.overlay-color').value || "#000000";
         const rotate = parseFloat(overlay.querySelector('.overlay-rotate').value) || 0;
         const italic = overlay.querySelector('.overlay-italic').checked;
         const bold = overlay.querySelector('.overlay-bold').checked;
+        const outline = overlay.querySelector('.overlay-outline').checked;
         const centered = overlay.querySelector('.overlay-centered').checked;
         
-        ctx.save();
-        const posY = y * currentScale;
-        let posX = x * currentScale;
-        if (flipTextPos) {
-          posX = (labelWidth - x) * currentScale;
+        // Use the passed scaledFontSize parameter
+        const finalFontSize = fontSize * scaledFontSize;
+        
+        // Only apply mirroring logic when explicitly requested
+        if (applyMirroring) {
+          // Map label index (1 becomes 7, 2 becomes 6, etc.)
+          labelIndex = labelIndex < 4 ? labelIndex : 7 - labelIndex;
+
+          // Calculate estimated text width for margin detection
+          ctx.save();
+          ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + finalFontSize + "px " + fontFamily;
+          const textWidth = ctx.measureText(text).width / currentScale;
+          ctx.restore();
+
+          // Define printer margin threshold (in mm)
+          const marginThreshold = 5; // 5mm from edge
+
+          // Check if text is near right edge
+          const isNearRightMargin = (x + textWidth) > (labelWidth - marginThreshold);
+          const isNearLeftMargin = x < marginThreshold;
+
+          // Adjust position to avoid printer margins
+          if (isNearRightMargin || isNearLeftMargin) {
+            x = labelWidth - x - textWidth; // Mirror 
+          }
         }
-        ctx.translate(posX, posY);
+
+        ctx.save();
+        ctx.translate(x * currentScale, y * currentScale);
         ctx.rotate(rotate * Math.PI / 180);
         ctx.fillStyle = color;
         if (centered) {
@@ -428,114 +466,25 @@
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
         }
-        ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + (fontSize * 1.333) + "px " + fontFamily;
+        ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + finalFontSize + "px " + fontFamily;
         ctx.fillText(text, 0, 0);
+        if (outline) {
+          ctx.strokeStyle = "#000000";
+          ctx.lineWidth = 0.5 * (currentScale / previewScale); // Adjust line width based on scale
+          ctx.strokeText(text, 0, 0);
+        }
         ctx.restore();
       });
-    }
-
-    function drawMarginOverlay(ctx, currentScale, labelIndex) {
-      const margin = 5 * currentScale; // 5mm margin
-      const edges = { top: false, bottom: false, left: false, right: false };
-      switch (labelIndex) {
-        case 1:
-          edges.left = true;
-          edges.top = true;
-          break;
-        case 2:
-        case 3:
-          edges.top = true;
-          break;
-        case 4:
-          edges.top = true;
-          edges.right = true;
-          break;
-        case 5:
-          edges.left = true;
-          edges.bottom = true;
-          break;
-        case 6:
-        case 7:
-          edges.bottom = true;
-          break;
-        case 8:
-          edges.bottom = true;
-          edges.right = true;
-          break;
-      }
-
-      ctx.fillStyle = 'rgba(255,0,0,0.5)';
-      if (edges.left) {
-        ctx.fillRect(0, 0, margin, labelHeight * currentScale);
-      }
-      if (edges.right) {
-        ctx.fillRect((labelWidth * currentScale) - margin, 0, margin, labelHeight * currentScale);
-      }
-      if (edges.top) {
-        ctx.fillRect(0, 0, labelWidth * currentScale, margin);
-      }
-      if (edges.bottom) {
-        ctx.fillRect(0, (labelHeight * currentScale) - margin, labelWidth * currentScale, margin);
-      }
-    }
-
-    function drawSheetMargins(ctx) {
-      for (let idx = 1; idx <= 8; idx++) {
-        const col = (idx - 1) % 2;
-        const row = Math.floor((idx - 1) / 2);
-        ctx.save();
-        ctx.translate(col * labelWidth * previewScale, row * labelHeight * previewScale);
-        drawMarginOverlay(ctx, previewScale, idx);
-        ctx.restore();
-      }
-    }
-
-    async function drawLabelAt(ctx, labelIndex, offsetX, offsetY) {
-      const off = document.createElement('canvas');
-      off.width = labelWidth * previewScale;
-      off.height = labelHeight * previewScale;
-      const octx = off.getContext('2d');
-
-      const flipVertical = labelIndex <= 4;
-      const flipTextPos = (labelIndex === 1 || labelIndex === 8);
-
-      octx.save();
-      if (flipVertical) {
-        octx.translate(0, off.height);
-        octx.scale(1, -1);
-      }
-
-      if (window.backgroundImgData) {
-        const bgImg = new Image();
-        await new Promise(res => {
-          bgImg.onload = function() {
-            octx.drawImage(bgImg, 0, 0, off.width, off.height);
-            res();
-          };
-          bgImg.src = window.backgroundImgData;
-        });
-      } else {
-        octx.fillStyle = '#fff';
-        octx.fillRect(0, 0, off.width, off.height);
-        octx.strokeStyle = '#000';
-        octx.strokeRect(0, 0, off.width, off.height);
-      }
-
-      await drawPreviewElements(octx, previewScale, flipTextPos);
-      octx.restore();
-      ctx.drawImage(off, offsetX, offsetY);
     }
     
     // ------------------ Dynamic Preview Update ------------------
-      const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize'];
-      previewInputs.forEach(id => {
-        document.getElementById(id).addEventListener('input', updatePreview);
-      });
-      ['previewAll', 'previewLabel', 'showMargin'].forEach(id => {
-        document.getElementById(id).addEventListener('change', updatePreview);
-      });
+    const previewInputs = ['qrOffsetX', 'qrOffsetY', 'qrSize'];
+    previewInputs.forEach(id => {
+      document.getElementById(id).addEventListener('input', updatePreview);
+    });
     document.getElementById('generate-form').addEventListener('input', updatePreview);
     document.getElementById('text-overlays-container').addEventListener('input', updatePreview);
+    document.getElementById('a4PreviewCheckbox').addEventListener('change', updatePreview);
     updatePreview();
     
     // ------------------ QR Code Center Button ------------------
@@ -597,6 +546,7 @@
         <input type="number" class="overlay-rotate w-full p-1 border" value="${config.rotate}"><br>
         <label><input type="checkbox" class="overlay-italic" ${config.italic ? "checked" : ""}> Italic</label>
         <label><input type="checkbox" class="overlay-bold" ${config.bold ? "checked" : ""}> Bold</label>
+        <label><input type="checkbox" class="overlay-outline" ${config.outline ? "checked" : ""}> Outline</label>
         <label><input type="checkbox" class="overlay-centered" ${config.centered ? "checked" : ""}> Centered</label><br>
         <button class="center-text bg-indigo-500 text-white p-1 mt-1">Center Text</button>
         <button class="remove-text bg-red-500 text-white p-1 mt-1">Remove</button>
@@ -639,17 +589,11 @@
     }
     
     // ------------------ Generate Label Image for PDF (High Resolution) ------------------
-    async function generateLabelImage(url, flipTextPos, flipVertical) {
+    async function generateLabelImage(url, row, col) {
       const canvas = document.createElement('canvas');
       canvas.width = labelWidth * pdfScale;
       canvas.height = labelHeight * pdfScale;
       const ctx = canvas.getContext('2d');
-
-      ctx.save();
-      if (flipVertical) {
-        ctx.translate(0, canvas.height);
-        ctx.scale(1, -1);
-      }
       
       if (window.backgroundImgData) {
         await new Promise(resolve => {
@@ -689,44 +633,10 @@
         });
       }
       
-      // Draw text overlays.
-      const container = document.getElementById('text-overlays-container');
-      const overlays = container.querySelectorAll('.text-overlay');
-      overlays.forEach(overlay => {
-        const text = overlay.querySelector('.overlay-text').value;
-        const x = parseFloat(overlay.querySelector('.overlay-x').value) || 0;
-        const y = parseFloat(overlay.querySelector('.overlay-y').value) || 0;
-        const fontSize = parseFloat(overlay.querySelector('.overlay-font-size').value) || 12;
-        const fontFamily = overlay.querySelector('.overlay-font-family').value || "Arial";
-        const color = overlay.querySelector('.overlay-color').value || "#000000";
-        const rotate = parseFloat(overlay.querySelector('.overlay-rotate').value) || 0;
-        const italic = overlay.querySelector('.overlay-italic').checked;
-        const bold = overlay.querySelector('.overlay-bold').checked;
-        const centered = overlay.querySelector('.overlay-centered').checked;
-        
-        ctx.save();
-        let posX = x * pdfScale;
-        const posY = y * pdfScale;
-        if (flipTextPos) {
-          posX = (labelWidth - x) * pdfScale;
-        }
-        ctx.translate(posX, posY);
-        ctx.rotate(rotate * Math.PI / 180);
-        ctx.fillStyle = color;
-        if (centered) {
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-        } else {
-          ctx.textAlign = "left";
-          ctx.textBaseline = "top";
-        }
-        const scaledFontSize = fontSize * 1.333 * (pdfScale / previewScale);
-        ctx.font = (italic ? "italic " : "") + (bold ? "bold " : "") + scaledFontSize + "px " + fontFamily;
-        ctx.fillText(text, 0, 0);
-        ctx.restore();
-      });
+      // Draw text overlays using the same function as preview
+      const labelIndex = row * 2 + col; // Calculate label index from row and col
+      drawTextOverlays(ctx, pdfScale, 1.333 * (pdfScale / previewScale), labelIndex, true);
       
-      ctx.restore();
       return canvas.toDataURL("image/png");
     }
     
@@ -771,9 +681,11 @@
           const labelX = col * labelWidth;
           const labelY = row * labelHeight;
           
-          const flipTextPos = (labelIndexOnPage === 0 || labelIndexOnPage === 7);
-          const flipVertical = labelIndexOnPage <= 3;
-          let labelDataUrl = await generateLabelImage(group[i], flipTextPos, flipVertical);
+          let labelDataUrl = await generateLabelImage(group[i], row, col);
+          // For labels in the first column, flip both horizontally and vertically.
+          if (col === 0) {
+            labelDataUrl = await flipImageBoth(labelDataUrl, labelWidth * pdfScale, labelHeight * pdfScale);
+          }
           doc.addImage(labelDataUrl, "PNG", labelX, labelY, labelWidth, labelHeight);
         }
         const pdfData = doc.output("arraybuffer");
